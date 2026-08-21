@@ -1,0 +1,47 @@
+# The outline: the single source of order and numbering for the whole document.
+#
+# Section files never carry a number. Insert an entry here and everything below
+# it renumbers, in the body and on the contents page together.
+
+product:
+  name: Meridian
+  vendor: Meridian
+  platform_version: "1.0"
+
+document:
+  title: Technical Documentation
+  subtitle: User Guide
+  confidentiality: ""
+
+defaults:
+  profile: default
+  audience: operator
+
+build:
+  # The sheet and the margins are page setup and live in
+  # content/typography.yaml, so the PDF and the DOCX read one setting.
+  screenshot_width_cm: 15.0     # how wide a figure prints
+  toc_depth: 3                  # deepest level listed on the contents page
+
+outline:
+  - id: introduction
+    children:
+      - id: introduction.meridian-overview
+  - id: getting-started
+    children:
+      - id: getting-started.signing-in
+  - id: dashboard
+    children:
+      - id: dashboard.overview
+  - id: accounts
+    children:
+      - id: accounts.list
+      - id: accounts.detail
+  - id: settings
+    children:
+      - id: settings.workspace
+
+lint:
+  # Documented exceptions. Every suppression names its rule and what it covers,
+  # so the list itself stays reviewable.
+  allow: []

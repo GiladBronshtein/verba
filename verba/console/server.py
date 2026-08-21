@@ -112,7 +112,7 @@ class ConsoleState:
         envs = self.envs()
         env = envs.current()
         if env is not None:
-            override = envs.as_site(env)
+            override = envs.as_site(env, fallback_login=site.get("login"))
             site = {**site, **{k: v for k, v in override.items() if v or k == "login"}}
         return site, screens
 
@@ -789,6 +789,14 @@ class Handler(BaseHTTPRequestHandler):
                     "findings": d.check(st.reload()),
                 })
 
+            if path == "/api/jobs/running":
+                return self.json({"job": st.jobs.running()})
+
+            if path == "/api/documents":
+                from ..workspaces import default_home, listing
+                return self.json({"documents": listing(st.root),
+                                  "home": str(default_home())})
+
             if path == "/api/layout":
                 from .. import layout
                 return self.json(layout.read(st.root))
@@ -1089,6 +1097,47 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(str(e))
                 return self.json({"ok": True,
                                   "message": f"set in {t.face('document').label}"})
+
+            if path == "/api/documents/open":
+                # Re-point the whole console at another document. Everything
+                # derived from a project lives on ConsoleState, so replacing it
+                # is the switch: nothing else holds a stale root.
+                from ..workspaces import is_document, remember
+                target = Path((data or {}).get("path") or "").expanduser()
+                if not is_document(target):
+                    return self.fail(f"no document at {target}")
+                Handler.state = ConsoleState(target, None)
+                remember(target)
+                return self.json({"ok": True, "path": str(target),
+                                  "message": f"opened {target.name}"})
+
+            if path == "/api/documents/forget":
+                from ..workspaces import forget
+                forget((data or {}).get("path") or "")
+                return self.json({"ok": True,
+                                  "message": "removed from the list. "
+                                             "the folder itself is untouched"})
+
+            if path == "/api/documents/new":
+                from ..scaffold import Answers, Scaffold
+                from ..workspaces import is_document, remember
+                d = data or {}
+                where = Path(d.get("path") or "").expanduser()
+                if not where.name:
+                    return self.fail("where should the new document go?")
+                if is_document(where):
+                    return self.fail(f"there is already a document at {where}")
+                try:
+                    answers = Answers(**{k: v for k, v in d.items()
+                                         if k in Answers.__dataclass_fields__ and v})
+                except (ValueError, TypeError) as e:
+                    return self.fail(str(e))
+                where.mkdir(parents=True, exist_ok=True)
+                Scaffold(root=where, a=answers).build()
+                Handler.state = ConsoleState(where, None)
+                remember(where)
+                return self.json({"ok": True, "path": str(where),
+                                  "message": f"{answers.product} is ready"})
 
             if path == "/api/layout/set":
                 from .. import layout
@@ -1608,7 +1657,9 @@ def _all_images(root: Path) -> dict:
 
 def serve(root: Path, port: int = 8800, profile: str | None = None,
           open_browser: bool = True):
+    from ..workspaces import remember
     Handler.state = ConsoleState(root, profile)
+    remember(root)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}"
     print(f"verba console  {url}")

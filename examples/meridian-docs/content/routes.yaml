@@ -1,0 +1,46 @@
+# Learned routes. Written by `verba capture`: the URL each screen
+# actually resolved to, plus how long it took and when it was last seen.
+# A per-section recrawl navigates straight here and falls back to the
+# screen's steps if the URL no longer resolves. Safe to delete: the next
+# capture rebuilds it.
+routes:
+  accounts.detail:
+    last_seen: '2026-08-21T20:59:06'
+    reached_by: url
+    seconds: 1.2
+    sections:
+    - accounts.detail
+    title: Account detail
+    url: http://127.0.0.1:8910/accounts/1
+  accounts.list:
+    last_seen: '2026-08-21T20:59:05'
+    reached_by: url
+    seconds: 1.2
+    sections:
+    - accounts.list
+    title: Accounts
+    url: http://127.0.0.1:8910/accounts
+  auth.signin:
+    last_seen: '2026-08-21T20:59:03'
+    reached_by: steps
+    seconds: 1.1
+    sections:
+    - getting-started.signing-in
+    title: Sign in
+    url: http://127.0.0.1:8910/login
+  dashboard:
+    last_seen: '2026-08-21T20:59:04'
+    reached_by: url
+    seconds: 1.1
+    sections:
+    - dashboard.overview
+    title: Dashboard
+    url: http://127.0.0.1:8910/
+  settings.workspace:
+    last_seen: '2026-08-21T20:59:08'
+    reached_by: url
+    seconds: 1.3
+    sections:
+    - settings.workspace
+    title: Workspace settings
+    url: http://127.0.0.1:8910/settings

@@ -190,7 +190,7 @@ def cmd_capture(args):
             print(f"fix it with: python3 -m verba env "
                   f"{'signin' if env.auth == 'sso' else 'password'} {env.id}")
             return 1
-        site = {**site, **envs.as_site(env)}
+        site = {**site, **envs.as_site(env, fallback_login=site.get("login"))}
         if not env.export_credentials():
             print(f"{env.label or env.id}: the sign-in could not be read from the "
                   f"keychain. Run: python3 -m verba env password {env.id}")

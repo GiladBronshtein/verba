@@ -821,3 +821,51 @@ label:has(> input[type="checkbox"]) {
 .step.done .steptitle{color:var(--text-2)}
 .stepbody{min-width:0;flex:1}
 .steptitle{font-size:13.5px;font-weight:600;margin-bottom:3px}
+
+/* ── the next step ─────────────────────────────────────────────────────────
+   One line above every view saying what is worth doing now. Colour carries the
+   urgency, but never alone: the words say the same thing, because a person who
+   cannot tell the amber from the green still has to be able to work. */
+.nextbar{display:flex;align-items:center;gap:14px;padding:13px 16px;margin:0 0 20px;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  border-left-width:3px}
+.nextbar.ok{border-left-color:var(--ok)}
+.nextbar.go{border-left-color:var(--brand-lift)}
+.nextbar.warn{border-left-color:var(--warn)}
+.nextbar.bad{border-left-color:var(--bad)}
+.nsdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--text-3)}
+.nextbar.ok .nsdot{background:var(--ok)}
+.nextbar.go .nsdot{background:var(--brand-lift)}
+.nextbar.warn .nsdot{background:var(--warn)}
+.nextbar.bad .nsdot{background:var(--bad)}
+.nsbody{flex:1;min-width:0}
+.nswhat{font-size:13.5px;font-weight:600}
+.nswhy{font-size:12.5px;color:var(--text-3);margin-top:2px}
+.nsacts{display:flex;gap:8px;flex:none}
+@media (max-width:820px){
+  .nextbar{flex-wrap:wrap}
+  .nsacts{width:100%}
+  .nsacts .act{flex:1;justify-content:center}
+}
+
+/* ── documents ─────────────────────────────────────────────────────────────
+   Which system you are documenting. A document is a folder; this is the list of
+   where they are. */
+.modal.wide{max-width:620px}
+#docTitle{cursor:pointer}
+#docTitle:hover{color:var(--text)}
+.docs{display:flex;flex-direction:column;gap:6px;margin-top:14px;
+  max-height:340px;overflow-y:auto}
+.docrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 12px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:inherit;font:inherit;cursor:pointer}
+.docrow:hover:not(:disabled){border-color:var(--brand-lift);background:var(--brand-soft)}
+.docrow.on{border-color:var(--brand-lift);background:var(--brand-soft);cursor:default}
+.docrow.gone{opacity:.55;cursor:not-allowed}
+.dmark{flex:none;display:grid;place-items:center;width:22px;color:var(--brand-lift)}
+.dmark svg{width:15px;height:15px}
+.dbody{min-width:0;flex:1}
+.dname{font-size:13.5px;font-weight:600}
+.dpath{font-family:var(--mono);font-size:12px;color:var(--text-3);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+.dgone{font-size:12px;color:var(--warn);flex:none}

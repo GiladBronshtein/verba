@@ -77,6 +77,14 @@ MASK_JS = r"""
     return out;
   };
 
+  // Rewrite the text nodes under one element, leaving its markup alone.
+  const walk = (root, fn) => {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (w.nextNode()) nodes.push(w.currentNode);
+    nodes.forEach((n) => { const v = fn(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; });
+  };
+
   // 1. column masking: values under a named table header
   (cfg.columns || []).forEach((rule) => {
     document.querySelectorAll('table').forEach((table) => {
@@ -87,10 +95,24 @@ MASK_JS = r"""
       table.querySelectorAll('tbody tr').forEach((tr) => {
         const cell = tr.children[idx];
         if (!cell) return;
-        const original = (cell.innerText || '').trim();
+        // Key on the entity's name, not on everything the cell happens to
+        // contain. A name cell usually carries a subtitle too, and the subtitle
+        // differs between screens: an accounts list shows the plan underneath
+        // and a dashboard shows the region. Keying on the whole cell therefore
+        // learned the same account twice, under two different placeholders, and
+        // two figures of one system contradicted each other.
+        // The longest line in the cell is the entity's name. The first line is
+        // not: a name cell usually opens with a two-letter avatar badge, and
+        // keying on that masks the badge while leaving the name in plain sight.
+        const lines = (cell.innerText || '').split('\n')
+          .map((s) => s.trim()).filter((s) => s.length > 2);
+        const original = lines.slice().sort((a, b) => b.length - a.length)[0] || '';
         if (!original || keep.has(original.toLowerCase())) return;
         const label = 'column:' + (rule.as || rule.header.toLowerCase());
-        cell.innerText = assign(label, original, rule.with);
+        const masked = assign(label, original, rule.with);
+        // Replace the name in place rather than rewriting the cell, so the
+        // subtitle, the avatar and any markup inside it survive.
+        walk(cell, (text) => text.split(original).join(masked));
       });
     });
   });

@@ -1,0 +1,85 @@
+# Screen registry: how to reach each documented screen, and what to read off it.
+#
+# `sections` binds a screen to the sections it evidences. After a capture the
+# labels read by `extract` are compared with what those sections claim, and every
+# difference lands in the review queue.
+#
+# Credentials come from the environment, never from this file:
+#   export VERBA_USER=... VERBA_PASSWORD=...
+
+site:
+  base_url: http://127.0.0.1:8910
+  login:
+    - goto: /login
+    - wait_for: "input"
+    - fill: 'input[type="email"]'
+      value: "${VERBA_USER}"
+    - fill: 'input[type="password"]'
+      value: "${VERBA_PASSWORD}"
+    - click: 'button[type="submit"]'
+    - wait_ms: 600
+  readonly:
+    allow_post_matching: []
+
+defaults: &table
+  columns: "table thead th"
+  actions: "main button"
+
+screens:
+  - id: auth.signin
+    title: Sign in
+    sections: [getting-started.signing-in]
+    shot: getting-started-signing-in-1.png
+    signed_out: true          # captured before sign-in, or it redirects away
+    steps:
+      - goto: /login
+      - wait_for: "form"
+    extract:
+      fields: "form input"
+
+  - id: dashboard
+    title: Dashboard
+    sections: [dashboard.overview]
+    shot: dashboard-overview-1.png
+    steps:
+      - goto: /
+      - wait_for: ".tiles"
+    extract:
+      <<: *table
+      tiles: ".tile .k"
+      nav: ".nav a"
+
+  - id: accounts.list
+    title: Accounts
+    sections: [accounts.list]
+    shot: accounts-list-1.png
+    steps:
+      - goto: /accounts
+      - wait_for: "table"
+    extract:
+      <<: *table
+      filters: ".seg button"
+
+  - id: accounts.detail
+    title: Account detail
+    sections: [accounts.detail]
+    shot: accounts-detail-1.png
+    steps:
+      - goto: /accounts/1
+      - wait_for: ".fields"
+    extract:
+      tabs: ".tabs a"
+      fields: ".fields .lbl"
+      actions: ".head button"
+
+  - id: settings.workspace
+    title: Workspace settings
+    sections: [settings.workspace]
+    shot: settings-workspace-1.png
+    steps:
+      - goto: /settings
+      - wait_for: ".field"
+    extract:
+      tabs: ".tabs a"
+      fields: ".field label"
+      toggles: ".toggle .t"

@@ -1,0 +1,5 @@
+capture/
+dist/
+.verba/sessions/
+content/masking-map.json
+__pycache__/

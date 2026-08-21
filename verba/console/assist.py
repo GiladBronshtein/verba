@@ -76,11 +76,34 @@ Output rules:
 # ANTHROPIC_BASE_URL is deliberately NOT consulted. It is set per shell and per
 # Claude Code session and can point somewhere the operator did not choose for
 # this pipeline. Set VERBA_GATEWAY to be explicit about it.
+# A project may pin all of this in content/doc.yaml, which is the durable place
+# for it: an organisation that meters model usage centrally needs every run to
+# go through its gateway, and an environment variable is set per shell and lost
+# the moment somebody opens a new terminal.
+#
+#   assist:
+#     gateway: https://gateway.example.com
+#     model: claude-sonnet-5
+#     key_helper: ~/.config/gateway-key.sh
+def _project_assist(root: Path | str = ".") -> dict:
+    try:
+        import yaml
+        cfg = yaml.safe_load(
+            (Path(root) / "content" / "doc.yaml").read_text(encoding="utf-8")) or {}
+        return cfg.get("assist") or {}
+    except Exception:
+        return {}
+
+
+_CFG = _project_assist(os.environ.get("VERBA_ROOT", "."))
+
 LITELLM_BASE = (os.environ.get("VERBA_GATEWAY")
-                or os.environ.get("VERBA_LITELLM_BASE") or "").rstrip("/")
-LITELLM_KEY_HELPER = os.environ.get(
-    "VERBA_KEY_HELPER", "")
-DEFAULT_MODEL = os.environ.get("VERBA_MODEL", "claude-sonnet-5")
+                or os.environ.get("VERBA_LITELLM_BASE")
+                or _CFG.get("gateway") or "").rstrip("/")
+LITELLM_KEY_HELPER = (os.environ.get("VERBA_KEY_HELPER")
+                      or _CFG.get("key_helper") or "")
+DEFAULT_MODEL = (os.environ.get("VERBA_MODEL")
+                 or _CFG.get("model") or "claude-sonnet-5")
 
 
 @dataclass
@@ -93,12 +116,18 @@ class AssistResult:
 
 
 def gateway_key() -> str | None:
-    """The Rise AI Hub key, read from the keychain by the same helper Claude
-    Code uses. The key is never written to this repository or logged."""
+    """The gateway key, printed on demand by a helper script.
+
+    Never written to the repository and never logged. The helper is usually a
+    one-line script that reads the key out of the OS keychain.
+    """
     direct = os.environ.get("VERBA_LITELLM_KEY") or os.environ.get("LITELLM_API_KEY")
     if direct:
         return direct
-    helper = Path(LITELLM_KEY_HELPER)
+    # `~` is how a path to a helper is written in a config file by hand, and
+    # Path does not expand it on its own, so a perfectly correct setting
+    # resolves to a file that does not exist.
+    helper = Path(LITELLM_KEY_HELPER).expanduser() if LITELLM_KEY_HELPER else Path("")
     if not helper.exists():
         return None
     try:

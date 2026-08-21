@@ -1,0 +1,14 @@
+# An edition. Section text writes {{ operator.name }} rather than naming a
+# company, so one content tree renders a neutral manual and a branded one.
+#
+#   verba edition                  what this edition carries
+#   verba edition drop <id>        leave a section out of it
+
+name: default
+audience: operator
+title_suffix: ""
+vars:
+  operator:
+    name: your organization
+    role: operator
+    possessive: your organization's

@@ -18,6 +18,7 @@ second factor is required, which it should be.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -43,6 +44,10 @@ class Environment:
     signed_in_when: str = ""            # selector proving a session is live
     mask_required: bool = False         # production data must never ship unmasked
     notes: str = ""
+    # Which keychain entries this project's passwords live under. A project that
+    # existed before the engine was renamed keeps its old prefix, so migrating
+    # does not silently orphan a password somebody has already stored.
+    keychain_prefix: str = KEYCHAIN_PREFIX
 
     @classmethod
     def from_dict(cls, d: dict) -> "Environment":
@@ -74,7 +79,7 @@ class Environment:
     # -- secrets ---------------------------------------------------------
     @property
     def keychain_service(self) -> str:
-        return f"{KEYCHAIN_PREFIX}-{self.id}"
+        return f"{self.keychain_prefix or KEYCHAIN_PREFIX}-{self.id}"
 
     def password(self) -> str | None:
         """The password for this profile's current user.
@@ -90,9 +95,15 @@ class Environment:
         if self.user:
             cmd += ["-a", self.user]
         r = subprocess.run(cmd + ["-w"], capture_output=True, text=True)
-        if r.returncode == 0:
-            return r.stdout.strip() or None
-        return None
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+
+        # The keychain is the right place for a password a person types once on
+        # their own machine, and the wrong place for one supplied to a scheduled
+        # run: there is no keychain in a container, and no one there to unlock
+        # it. VERBA_PASSWORD covers that, and is checked second so a stray
+        # variable in somebody's shell can never override what they saved.
+        return os.environ.get("VERBA_PASSWORD") or None
 
     def set_password(self, user: str, password: str):
         # Drop any entry for a previous username on this profile, so one profile
@@ -210,7 +221,12 @@ class Environments:
         path = root / CONFIG
         data = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else {}
         data = data or {}
-        envs = {e["id"]: Environment.from_dict(e) for e in data.get("environments", [])}
+        prefix = str(data.get("keychain_prefix", "") or KEYCHAIN_PREFIX)
+        envs = {}
+        for e in data.get("environments", []):
+            env = Environment.from_dict(e)
+            env.keychain_prefix = str(e.get("keychain_prefix", "") or prefix)
+            envs[env.id] = env
         return cls(root=root, active=data.get("active", "") or
                    (next(iter(envs), "") if envs else ""), items=envs)
 
@@ -256,14 +272,23 @@ class Environments:
         self.active = env_id
         self.save()
 
-    def as_site(self, env: Environment | None = None) -> dict:
-        """Shape an environment the way the capture engine expects a site."""
+    def as_site(self, env: Environment | None = None,
+                fallback_login: list | None = None) -> dict:
+        """Shape an environment the way the capture engine expects a site.
+
+        Sign-in steps come from the connection first, then from whatever the
+        project wrote in screens.yaml, and only then from the generic default.
+        The middle step used to be missing, so a project that had described its
+        own sign-in in screens.yaml watched the crawler ignore it and try a
+        path that belonged to a different product entirely.
+        """
         env = env or self.current()
         if env is None:
             return {}
         site = {"base_url": env.base_url, "signed_in_when": env.signed_in_when}
         if env.auth == "form":
-            site["login"] = env.login_steps or DEFAULT_FORM_LOGIN
+            site["login"] = (env.login_steps or fallback_login
+                             or DEFAULT_FORM_LOGIN)
         else:
             site["login"] = []
             site["storage_state"] = str(env.session_path(self.root))
@@ -282,9 +307,11 @@ class Environments:
         return out
 
 
-# The product's own sign-in page, used when a profile does not override it.
+# A last-resort guess, used only when neither the connection nor screens.yaml
+# says how to sign in. `/login` is the commonest path; anything else belongs in
+# the project's own screens.yaml, which is now consulted first.
 DEFAULT_FORM_LOGIN = [
-    {"goto": "/auth/login"},
+    {"goto": "/login"},
     {"wait_for": "input"},
     {"wait_ms": 1200},
     {"fill": 'input[autocomplete="username"], input[name="email"], input[type="email"]',

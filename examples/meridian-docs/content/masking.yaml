@@ -1,0 +1,35 @@
+# Screenshot masking.
+#
+# Real names and identifiers are replaced in the page's DOM immediately before
+# each screenshot is taken, and in the labels read off the page afterwards.
+# Nothing is ever submitted: the substitution exists only in the captured pixels.
+#
+# The mapping is stored in content/masking-map.json, so a given real value always
+# becomes the same placeholder, in this crawl and in crawls months from now.
+
+enabled: true
+
+# Values under a table header, replaced row by row. This is the main rule: it
+# catches every name in a list view without knowing the names in advance, which
+# matters because the data changes between crawls.
+columns:
+  # Two screens list the same entities under different headers. Both rules share
+  # `as: account`, so a name masked on one screen gets the same placeholder on
+  # the other and the document does not contradict itself between figures.
+  - header: NAME
+    with: "Example Account {n}"
+    as: account
+  - header: ACCOUNT
+    with: "Example Account {n}"
+    as: account
+
+patterns:
+  - name: account-id
+    pattern: "acc_[0-9a-f]{20}"
+    with: "acc_{n:020d}"
+
+literals:
+  - match: "Meridian Operations"
+    with: "Example Workspace"
+  - match: "Dana Reyes"
+    with: "Alex Morgan"

@@ -1,0 +1,15 @@
+# How the document looks.
+#
+#   verba themes            what is available, and what each is for
+#   verba themes --use ink  pick a different one
+#
+# `tokens` overrides single values without forking a whole theme, which is the
+# common case: a company has one brand colour and no opinion about the other
+# nineteen. Every built-in theme is checked for contrast, so an override is the
+# one place a document can be made unreadable. `verba themes --check` measures
+# whatever is set here.
+
+use: slate
+
+tokens: {}
+  # brand_blue: "3137DB"

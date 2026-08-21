@@ -1,0 +1,20 @@
+[
+  {
+    "id": "20260821T205308-8be3329ebc04",
+    "signature": "8be3329ebc04",
+    "at": "2026-08-21T20:53:08",
+    "where": "capture (all)",
+    "kind": "TimeoutError",
+    "message": "Page.wait_for_selector: Timeout 20000ms exceeded.\nCall log:\n  - waiting for locator(\"input\") to be visible\n",
+    "traceback": "Traceback (most recent call last):\n  File \"/Users/Gilad.Bronshtein/Documents/Repos/verba/verba/cli.py\", line 234, in cmd_capture\n    manifest = cap.run(only=only, log=print, prefer_url=not args.replay_steps)\n  File \"/Users/Gilad.Bronshtein/Documents/Repos/verba/verba/capture.py\", line 277, in run\n    self.login(page, log=emit)\n    ~~~~~~~~~~^^^^^^^^^^^^^^^^\n  File \"/Users/Gilad.Bronshtein/Documents/Repos/verba/verba/capture.py\", line 240, in login\n    self._run_step(page, step, phase=\"login\", log=log)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/Gilad.Bronshtein/Documents/Repos/verba/verba/capture.py\", line 222, in _run_step\n    page.wait_for_selector(step[\"wait_for\"], timeout=DEFAULT_TIMEOUT)\n    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/sync_api/_generated.py\", line 8213, in wait_for_selector\n    self._sync(\n    ~~~~~~~~~~^\n        self._impl_obj.wait_for_selector(\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n            selector=selector, timeout=timeout, state=state, strict=strict\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n        )\n        ^\n    )\n    ^\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/_impl/_sync_base.py\", line 115, in _sync\n    return task.result()\n           ~~~~~~~~~~~^^\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/_impl/_page.py\", line 419, in wait_for_selector\n    return await self._main_frame.wait_for_selector(**locals_to_params(locals()))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/_impl/_frame.py\", line 369, in wait_for_selector\n    await self._channel.send(\n        \"waitForSelector\", self._timeout, locals_to_params(locals())\n    )\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/_impl/_connection.py\", line 69, in send\n    return await self._connection.wrap_api_call(\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<3 lines>...\n    )\n    ^\n  File \"/Users/Gilad.Bronshtein/.pyenv/versions/3.13.0/lib/python3.13/site-packages/playwright/_impl/_connection.py\", line 559, in wrap_api_call\n    raise rewrite_error(error, f\"{parsed_st['apiName']}: {error}\") from None\nplaywright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 20000ms exceeded.\nCall log:\n  - waiting for locator(\"input\") to be visible\n\n",
+    "context": {
+      "base_url": "http://127.0.0.1:8910",
+      "connection": "default",
+      "masking": true
+    },
+    "seen": 1,
+    "last_at": "2026-08-21T20:53:08",
+    "resolved": false,
+    "resolution": ""
+  }
+]

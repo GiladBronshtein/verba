@@ -78,6 +78,20 @@ class JobRunner:
     def get(self, job_id: str) -> Job | None:
         return self.jobs.get(job_id)
 
+    def running(self) -> dict | None:
+        """Whatever is running right now, for any window that asks.
+
+        A crawl started in one view used to be visible only in that view: leave
+        the page and the job carried on with nothing to show for it, so the
+        honest answer to "is it still going?" was to start another one.
+        """
+        live = [j for j in self.jobs.values() if j.state == "running"]
+        if not live:
+            return None
+        j = sorted(live, key=lambda x: x.started)[0]
+        return {"id": j.id, "name": j.name, "detail": j.detail,
+                "state": j.state, "started": j.started}
+
     def recent(self, limit: int = 12) -> list[dict]:
         js = sorted(self.jobs.values(), key=lambda j: j.started, reverse=True)
         return [{"id": j.id, "name": j.name, "detail": j.detail, "state": j.state,

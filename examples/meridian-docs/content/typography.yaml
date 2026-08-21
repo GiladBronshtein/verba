@@ -1,0 +1,78 @@
+# The typefaces the outputs are set in, and the page they are set on.
+#
+#   verba fonts             what is installed, and what is served
+#   verba layout            the sheet, the margins, how text is set
+
+document: inter
+console: inter
+
+# Page setup. `paper` is the sheet; everything else is in millimetres.
+# Paper may be A4, A5, Letter or Legal. It sets the sheet for the PDF and the
+# DOCX together, so the two cannot disagree about what they are printed on.
+#
+#   edge         white space from the paper edge to the header and footer text
+#   header_band  the height the header occupies, its rule included
+#   footer_band  the same for the footer
+#   gap          air between the header rule and the first line of body text
+
+page:
+  paper: A4
+  side: 18
+  edge: 12
+  header_band: 8
+  footer_band: 7
+  gap: 9
+
+# How body text is set. align is left or justify; hyphens is on or off.
+text:
+  align: left
+  hyphens: "on"
+
+faces:
+
+  inter:
+    label: Inter
+    body: ["Inter", "Helvetica Neue", "sans-serif"]
+    mono: ["JetBrains Mono", "SF Mono", "Menlo", "monospace"]
+    docx: Inter
+    docx_fallback: Calibri
+    body_pt: 10.2
+    line: 1.6
+    tighten: -0.011
+    webfont: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    note: Very large x-height, so it is set smaller and tracked in.
+
+  source-sans:
+    label: Source Sans 3
+    body: ["Source Sans 3", "Helvetica Neue", "sans-serif"]
+    mono: ["Source Code Pro", "SF Mono", "Menlo", "monospace"]
+    docx: Source Sans 3
+    docx_fallback: Calibri
+    body_pt: 10.8
+    line: 1.55
+    tighten: 0
+    webfont: "https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap"
+    note: Adobe's screen-and-print workhorse. Slightly small on the body, so it is set larger.
+
+  ibm-plex:
+    label: IBM Plex Sans
+    body: ["IBM Plex Sans", "Helvetica Neue", "sans-serif"]
+    mono: ["IBM Plex Mono", "SF Mono", "Menlo", "monospace"]
+    docx: IBM Plex Sans
+    docx_fallback: Calibri
+    body_pt: 10.2
+    line: 1.58
+    tighten: -0.004
+    webfont: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    note: Drawn for technical documentation. Unmistakable digits, a true mono companion.
+
+  system:
+    label: System default
+    body: ["-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"]
+    mono: ["SF Mono", "Menlo", "Consolas", "monospace"]
+    docx: Calibri
+    docx_fallback: Arial
+    body_pt: 10.5
+    line: 1.55
+    tighten: 0
+    note: Whatever the machine already has. Never missing, never distinctive.

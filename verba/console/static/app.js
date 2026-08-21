@@ -4,6 +4,15 @@ import { icon, iconSprite } from './icons.js';
 const $ = (s, r = document) => r.querySelector(s);
 const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c;
   if (h !== undefined) e.innerHTML = h; return e; };
+// A dialog body is sometimes markup and sometimes a built element. `el`'s third
+// argument is innerHTML, so passing a node there stringifies it to
+// "[object HTMLDivElement]" and the dialog comes up empty.
+const fill = (host, content) => {
+  if (content == null) return host;
+  if (content instanceof Node) host.append(content);
+  else host.innerHTML = content;
+  return host;
+};
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -71,7 +80,7 @@ function modal({ title, body, confirmLabel, confirmClass, needsReason, onConfirm
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     box.append(el('h3', null, (needsReason ? icon('x') : icon('alert')) + esc(title)));
-    box.append(el('div', 'body', body));
+    box.append(fill(el('div', 'body'), body));
 
     let ta = null;
     if (needsReason) {
@@ -197,9 +206,13 @@ async function refresh() {
   S = await api('/api/state');
   $('#profile').innerHTML = S.profiles
     .map(p => `<option ${p === S.profile ? 'selected' : ''}>${esc(p)}</option>`).join('');
-  $('#docTitle').textContent = `${S.product.name}`;
-  $('#docSub').textContent =
-    `${S.summary.sections} sections · ${S.summary.verified} verified`;
+  // The application is Verba and it is always Verba. What changes is which
+  // document you have open, so that is what the second line says, and clicking
+  // it is how you change it.
+  const dt = $('#docTitle');
+  dt.textContent = `${S.product.name} · ${S.summary.sections} sections`;
+  dt.title = 'Switch document, or start a new one';
+  dt.onclick = documentPicker;
   drawNav(); drawTree();
   render();
 }
@@ -221,7 +234,6 @@ const NAV = [
     ['queue',       'Changes',   'queue'],
     ['sections',    'Sections',  'sections'],
     ['document',    'Document',  'document'],
-    ['publish',     'Publish',   'publish'],
   ]},
   { label: 'Evidence', items: [
     ['images',      'Images',    'camera'],
@@ -326,9 +338,74 @@ function holder() {
   closeHints();
   const host = $('#main');
   host.innerHTML = '';
+  const bar = nextStepBar();
+  if (bar) host.append(bar);
   const h = el('div', 'hold');
   host.append(h);
   return h;
+}
+
+/* One line, in every view, naming the next thing worth doing.
+
+   The console showed six panels of true statements and left the reader to work
+   out which of them was their move. That is fine for someone who built it and
+   useless for everybody else: a document is a piece of work with an order to
+   it, and the interface should know that order rather than making each person
+   rediscover it.
+
+   The order is not a wizard and does not lock anything: every view is still one
+   click away in the rail. This only answers "what now", which is the question
+   an eleven-view tool is worst at answering on its own. */
+function nextStep() {
+  const s = (S && S.summary) || {};
+  if (!S) return null;
+  if (s.error)
+    return { tone: 'bad', what: `${s.error} thing${s.error > 1 ? 's' : ''} to fix`,
+             why: 'These stop the document being built.',
+             cta: 'Fix them', go: () => setView('findings') };
+  if (s.drift_items)
+    return { tone: 'warn',
+             what: `${s.drift_items} change${s.drift_items > 1 ? 's' : ''} in the live system`,
+             why: 'The product moved. Decide what the document should say.',
+             cta: 'Review them', go: () => setView('queue') };
+  if (!S.capture || !S.capture.run)
+    return { tone: 'go', what: 'Nothing has been photographed yet',
+             why: 'A crawl signs in, pictures every screen and reads its labels.',
+             cta: 'Capture the live system',
+             go: () => runJob('/api/capture', {}, 'capture') };
+  if (s.stale)
+    return { tone: 'warn', what: `${s.stale} section${s.stale > 1 ? 's' : ''} not checked lately`,
+             why: 'Re-crawl to confirm they still match the product.',
+             cta: 'Capture the live system',
+             go: () => runJob('/api/capture', {}, 'capture') };
+  return { tone: 'ok', what: 'The document matches the system and breaks no rules',
+           why: 'Nothing is outstanding. This is the moment to cut a version.',
+           cta: 'Publish', go: () => setView('publish') };
+}
+
+function nextStepBar() {
+  const n = nextStep();
+  if (!n) return null;
+  const bar = el('div', 'nextbar ' + n.tone);
+  const dot = el('span', 'nsdot');
+  const body = el('div', 'nsbody');
+  body.append(el('div', 'nswhat', esc(n.what)));
+  body.append(el('div', 'nswhy', esc(n.why)));
+  const act = el('button', 'act primary', esc(n.cta));
+  act.onclick = n.go;
+
+  const right = el('div', 'nsacts');
+  right.append(act);
+  // Publishing is where all of this is going, so it stays reachable from every
+  // view instead of being one more destination competing in the rail.
+  if (n.cta !== 'Publish') {
+    const pub = el('button', 'act ghost', icon('publish') + 'Publish');
+    pub.title = 'Build and cut a version';
+    pub.onclick = () => setView('publish');
+    right.append(pub);
+  }
+  bar.append(dot, body, right);
+  return bar;
 }
 
 function render() {
@@ -1078,6 +1155,157 @@ async function drawFields(m) {
       `<b>${esc(a.field)}</b> on ${esc(a.screen)}: ${esc(a.issue)}`)));
     m.append(p);
   }
+}
+
+/* ------------------------------------------------------------- documents */
+/* Which system you are documenting.
+
+   The console served exactly one folder, fixed when the process started, which
+   is the right shape for a tool living inside the single project it serves and
+   the wrong one for a tool you point at whatever you like. Documenting a second
+   system meant a second terminal and a second port, and remembering which tab
+   was which. A document is still only a folder with a content/doc.yaml in it;
+   this is the list of where they are. */
+async function documentPicker() {
+  let d;
+  try { d = await api('/api/documents'); }
+  catch (e) { return toast(e.message, true); }
+
+  const body = el('div');
+  body.append(el('div', 'muted',
+    'Every document this machine knows about. Opening one switches the whole ' +
+    'console over to it; nothing about the one you leave is changed.'));
+
+  const list = el('div', 'docs');
+  d.documents.forEach(doc => {
+    const row = el('button', 'docrow' + (doc.current ? ' on' : '') +
+                             (doc.exists ? '' : ' gone'));
+    row.innerHTML =
+      `<div class="dmark">${icon(doc.current ? 'check' : 'document')}</div>
+       <div class="dbody"><div class="dname">${esc(doc.product)}</div>
+         <div class="dpath">${esc(doc.path)}</div></div>` +
+      (doc.exists ? '' : '<div class="dgone">missing</div>');
+    row.disabled = doc.current || !doc.exists;
+    row.onclick = async () => {
+      try {
+        const r = await api('/api/documents/open', { method: 'POST',
+                                                     json: { path: doc.path } });
+        toast(r.message);
+        scrim.remove();
+        view = 'overview';
+        await refresh();
+      } catch (e) { toast(e.message, true); }
+    };
+    list.append(row);
+  });
+  if (!d.documents.length) {
+    list.append(el('div', 'empty', 'No documents yet.'));
+  }
+  body.append(list);
+
+  const scrim = el('div', 'scrim');
+  const box = el('div', 'modal wide');
+  box.setAttribute('role', 'dialog');
+  box.setAttribute('aria-modal', 'true');
+  box.append(el('h3', null, icon('layers') + 'Documents'));
+  box.append(fill(el('div', 'body'), body));
+
+  const foot = el('div', 'foot');
+  const close = () => { scrim.remove(); document.removeEventListener('keydown', key); };
+  const key = (e) => { if (e.key === 'Escape') close(); };
+  const cancel = el('button', 'act ghost', 'Close');
+  cancel.onclick = close;
+  const fresh = el('button', 'act primary', icon('plus') + 'New document');
+  fresh.onclick = () => { close(); newDocument(d.home); };
+  foot.append(cancel, fresh);
+  box.append(foot);
+  scrim.append(box);
+  document.body.append(scrim);
+  document.addEventListener('keydown', key);
+  scrim.onclick = (e) => { if (e.target === scrim) close(); };
+}
+
+/* Starting one. The same six questions the command line asks, because a person
+   who has never seen this should not have to learn a file format to begin. Every
+   field has a default, so the whole thing can be submitted as it stands. */
+async function newDocument(home) {
+  const uid = 'nd' + Math.random().toString(36).slice(2, 7);
+  const body = el('div');
+  body.append(el('div', 'muted',
+    'Six questions, then you have a document that builds. Everything here can ' +
+    'be changed afterwards.'));
+
+  const g = el('div', 'grid2'); g.style.marginTop = '14px';
+  g.innerHTML = `
+    <div class="field"><label for="${uid}p">What is the product called?</label>
+      <input id="${uid}p" placeholder="Acme Console"></div>
+    <div class="field"><label for="${uid}v">Who makes it?</label>
+      <input id="${uid}v" placeholder="same as the product"></div>
+    <div class="field" style="grid-column:1/-1">
+      <label for="${uid}a">What does it do, in one sentence?</label>
+      <input id="${uid}a" placeholder="Where operators configure campaigns."></div>
+    <div class="field"><label for="${uid}u">Where does it live?</label>
+      <input id="${uid}u" placeholder="https://app.example.com"></div>
+    <div class="field"><label for="${uid}h">How do you sign in?</label>
+      <select id="${uid}h">
+        <option value="form">A username and password</option>
+        <option value="sso">Single sign-on</option>
+        <option value="none">No sign-in needed</option>
+      </select></div>`;
+  body.append(g);
+
+  const looks = el('div', 'field'); looks.style.marginTop = '4px';
+  looks.innerHTML = `<label for="${uid}t">Which look?</label>
+    <select id="${uid}t">
+      <option value="slate">Slate — the neutral default</option>
+      <option value="ink">Ink — editorial monochrome, one warm accent</option>
+      <option value="atlas">Atlas — deep teal, engineering register</option>
+      <option value="ember">Ember — warm charcoal and amber</option>
+      <option value="forest">Forest — deep green, unbranded</option>
+    </select>`;
+  body.append(looks);
+
+  const where = el('div', 'field'); where.style.marginTop = '11px';
+  where.innerHTML = `<label for="${uid}w">Where should it go?</label>
+    <input id="${uid}w" value="${esc(home || '')}">
+    <div class="help">A folder is created here. The product name is added to it.</div>`;
+  body.append(where);
+
+  const scrim = el('div', 'scrim');
+  const box = el('div', 'modal wide');
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true');
+  box.append(el('h3', null, icon('plus') + 'New document'));
+  box.append(fill(el('div', 'body'), body));
+
+  const foot = el('div', 'foot');
+  const close = () => { scrim.remove(); document.removeEventListener('keydown', key); };
+  const key = (e) => { if (e.key === 'Escape') close(); };
+  const cancel = el('button', 'act ghost', 'Cancel');
+  cancel.onclick = close;
+  const make = el('button', 'act primary', icon('check') + 'Create it');
+  make.onclick = async () => {
+    const v = (k) => (box.querySelector('#' + uid + k).value || '').trim();
+    const product = v('p') || 'My Product';
+    const base = v('w') || home || '';
+    const slug = product.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    make.disabled = true;
+    try {
+      const r = await api('/api/documents/new', { method: 'POST', json: {
+        path: base.replace(/\/$/, '') + '/' + (slug || 'document'),
+        product, vendor: v('v'), about: v('a'), base_url: v('u'),
+        auth: v('h'), theme: v('t') } });
+      toast(r.message);
+      close();
+      view = 'overview';
+      await refresh();
+    } catch (e) { toast(e.message, true); make.disabled = false; }
+  };
+  foot.append(cancel, make);
+  box.append(foot);
+  scrim.append(box);
+  document.body.append(scrim);
+  document.addEventListener('keydown', key);
+  box.querySelector('#' + uid + 'p').focus();
 }
 
 /* -------------------------------------------------------------- editions */
@@ -3111,10 +3339,34 @@ function boot() {
     currentId = null; await refresh(); setView('overview');
   };
   window.onbeforeunload = () => dirty ? 'Unsaved edits' : undefined;
+  adoptRunningJob();
   refresh().then(() => setView('overview')).catch(e => {
     holder().innerHTML = `<div class="panel warn-edge"><h3>Could not load the project</h3>
       <div class="muted">${esc(e.message)}</div></div>`;
   });
+}
+
+/* A crawl is a property of the machine, not of the tab that started it.
+
+   The dock only ever existed for a job you launched yourself, in the view you
+   launched it from. Reload the page, open a second window, or start a crawl
+   from the command line, and the console showed nothing at all while the
+   browser was busy driving a real product: the honest way to find out whether
+   it was still going was to start another one.
+
+   So the console asks. Every few seconds, and immediately on load. */
+let adopted = null;
+async function adoptRunningJob() {
+  try {
+    const r = await api('/api/jobs/running');
+    const job = r.job;
+    if (job && job.id !== adopted && !dockEl) {
+      adopted = job.id;
+      watchJob(job.id, job.name || 'Running');
+    }
+    if (!job) adopted = null;
+  } catch (e) { /* the console still works without knowing */ }
+  setTimeout(adoptRunningJob, 3000);
 }
 
 // A handle for the browser console. This is a local tool on a local port; being

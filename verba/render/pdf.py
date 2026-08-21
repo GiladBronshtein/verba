@@ -366,10 +366,17 @@ class PdfRenderer:
                   f"width:100%;padding:0 {pg.side}mm;box-sizing:border-box;"
                   "font-variant-numeric:tabular-nums;display:flex;"
                   "justify-content:space-between;align-items:center;")
+        # The running header names the product being documented and the company
+        # that makes it, and takes its rule from the theme. It used to print one
+        # particular company's name, in that company's blue, on every page of
+        # every document this engine produced.
+        vendor = self.p.config.get("product", {}).get("vendor", "")
+        mark = f"{vendor.upper()} | {prod}" if vendor and vendor.strip() != prod.strip() else prod
+        accent = f"#{self.theme.brand_blue}"
         header = (f'{reset}<div style="{chrome}'
                   f'padding-top:{pg.edge}mm;'
-                  f'border-bottom:0.5px solid #3137DB;padding-bottom:2.4mm;">'
-                  f'<span style="color:#3137DB;font-weight:700">RISE | {_esc(prod)}</span>'
+                  f'border-bottom:0.5px solid {accent};padding-bottom:2.4mm;">'
+                  f'<span style="color:{accent};font-weight:700">{_esc(mark)}</span>'
                   f'<span>Page <span class="pageNumber"></span> of '
                   f'<span class="totalPages"></span></span></div>')
         footer = (f'{reset}<div style="{chrome}'
