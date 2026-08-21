@@ -103,6 +103,7 @@ def page_accounts() -> str:
         f'<div class="n"><a href="/accounts/{i}">{name}</a></div>'
         f'<div class="e">{plan} plan</div></div></div></td>'
         f'<td class="mono">{aid}</td><td>{region}</td><td>{plan}</td>'
+        f'<td>Alex Morgan</td>'
         f'<td><span class="pill {PILL[st][0]}">{PILL[st][1]}</span></td></tr>'
         for i, (name, ini, aid, region, plan, st) in enumerate(ACCOUNTS, 1))
     return shell("Accounts", "accounts", "<b>Accounts</b>", f"""
@@ -116,8 +117,8 @@ def page_accounts() -> str:
   <div class="spacer" style="flex:1"></div>
   <button class="btn">Export</button>
   <button class="btn primary">New account</button></div>
-<table><thead><tr><th>Name</th><th>Account ID</th><th>Region</th><th>Plan</th>
-  <th>Status</th></tr></thead><tbody>{rows}</tbody></table></div>""")
+<table><thead><tr><th>Name</th><th>Account ID</th><th>Data Region</th><th>Plan</th>
+  <th>Owner</th><th>Status</th></tr></thead><tbody>{rows}</tbody></table></div>""")
 
 
 def page_account(idx: int) -> str:
@@ -130,8 +131,8 @@ def page_account(idx: int) -> str:
     &nbsp;<span class="mono" style="font-size:12.5px">{aid}</span></div></div></div>
   <div><button class="btn">Duplicate</button>
     <button class="btn primary">Edit account</button></div></div>
-<div class="card"><div class="tabs"><a class="on">Settings</a><a>Usage</a>
-  <a>Billing</a><a>Audit log</a></div>
+<div class="card"><div class="tabs"><a class="on">Configuration</a><a>Usage</a>
+  <a>Billing</a></div>
 <div class="fields">
   <div class="lbl">Display name<small>Shown across the console</small></div><div>{name}</div>
   <div class="lbl">Account ID<small>Immutable</small></div><div class="mono">{aid}</div>

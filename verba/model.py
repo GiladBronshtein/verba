@@ -15,6 +15,7 @@ Block syntax
     ```fields  ... ```      -> fields   (YAML list: field/type/required/description)
     ```actions ... ```      -> actions  (YAML list: action/description)
     ```columns ... ```      -> columns  (YAML list: column/description)
+    ```tabs ... ```         -> tabs     (YAML list: tab/description)
     ```terms   ... ```      -> terms    (YAML list: term/definition)
 """
 from __future__ import annotations
@@ -26,7 +27,7 @@ from typing import Any, Iterable
 
 import yaml
 
-BLOCK_LANGS = {"fields", "actions", "columns", "terms"}
+BLOCK_LANGS = {"fields", "actions", "columns", "terms", "tabs"}
 
 # Key that carries the human label for each structured block type.
 LABEL_KEY = {
@@ -34,6 +35,10 @@ LABEL_KEY = {
     "actions": "action",
     "columns": "column",
     "terms": "term",
+    # A tab is as visible as a column and changes as often. Without this the
+    # crawl read every tab off every screen and had nothing to compare them
+    # against, so a renamed or deleted tab never reached the review queue.
+    "tabs": "tab",
 }
 
 STATUSES = ("draft", "review", "verified", "stale")

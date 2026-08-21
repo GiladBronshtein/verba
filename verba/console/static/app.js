@@ -210,9 +210,20 @@ async function refresh() {
   // document you have open, so that is what the second line says, and clicking
   // it is how you change it.
   const dt = $('#docTitle');
-  dt.textContent = `${S.product.name} · ${S.summary.sections} sections`;
+  // A line of text that silently does something when clicked is not a control.
+  // It reads as a caption, so nobody clicks it, and the feature may as well not
+  // exist. This one says what it is and looks like it can be pressed.
+  dt.innerHTML = `<span class="dnow">${esc(S.product.name)}</span>` +
+                 `<svg class="dchev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+  dt.setAttribute('role', 'button');
+  dt.setAttribute('tabindex', '0');
   dt.title = 'Switch document, or start a new one';
   dt.onclick = documentPicker;
+  dt.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); documentPicker(); }
+  };
   drawNav(); drawTree();
   render();
 }
@@ -241,8 +252,9 @@ const NAV = [
     ['history',     'History',   'history'],
   ]},
   { label: 'Setup', fold: true, items: [
+    ['documents',   'Documents',   'layers'],
     ['connections', 'Connections', 'connections'],
-    ['editions',    'Editions',    'layers'],
+    ['editions',    'Editions',    'sections'],
     ['design',      'Design',      'palette'],
   ]},
 ];
@@ -359,15 +371,22 @@ function holder() {
 function nextStep() {
   const s = (S && S.summary) || {};
   if (!S) return null;
+  // The primary action does the work. It used to open a list, which is the
+  // interface saying "here is your homework": every one of these findings the
+  // system already knows how to clear, and asking a person to walk a list and
+  // press the same button on each is friction with nothing on the other side
+  // of it. What genuinely needs a decision is handed back afterwards.
   if (s.error)
     return { tone: 'bad', what: `${s.error} thing${s.error > 1 ? 's' : ''} to fix`,
-             why: 'These stop the document being built.',
-             cta: 'Fix them', go: () => setView('findings') };
+             why: 'These stop the document being built. Most of them clear themselves.',
+             cta: 'Fix what can be fixed', go: fixEverything,
+             also: ['See them', () => setView('findings')] };
   if (s.drift_items)
     return { tone: 'warn',
              what: `${s.drift_items} change${s.drift_items > 1 ? 's' : ''} in the live system`,
-             why: 'The product moved. Decide what the document should say.',
-             cta: 'Review them', go: () => setView('queue') };
+             why: 'The product moved. The mechanical ones apply on their own.',
+             cta: 'Apply what can be applied', go: fixEverything,
+             also: ['See them', () => setView('queue')] };
   if (!S.capture || !S.capture.run)
     return { tone: 'go', what: 'Nothing has been photographed yet',
              why: 'A crawl signs in, pictures every screen and reads its labels.',
@@ -383,6 +402,16 @@ function nextStep() {
            cta: 'Publish', go: () => setView('publish') };
 }
 
+/* Everything the system can settle, in one press.
+
+   It applies the mechanical differences, adopts the fresh screenshots, fills
+   the descriptions the evidence can answer and tidies the writing, measuring
+   the rules after each step and putting back anything that made the document
+   worse. Then it says what is left and why it is a person's call. */
+function fixEverything() {
+  runJob('/api/fix', {}, 'fix what can be fixed');
+}
+
 function nextStepBar() {
   const n = nextStep();
   if (!n) return null;
@@ -396,6 +425,11 @@ function nextStepBar() {
 
   const right = el('div', 'nsacts');
   right.append(act);
+  if (n.also) {
+    const b = el('button', 'act ghost', esc(n.also[0]));
+    b.onclick = n.also[1];
+    right.append(b);
+  }
   // Publishing is where all of this is going, so it stays reachable from every
   // view instead of being one more destination competing in the rail.
   if (n.cta !== 'Publish') {
@@ -420,6 +454,7 @@ function render() {
   if (view === 'connections') return drawConnections(m);
   if (view === 'design') return drawDesign(m);
   if (view === 'editions') return drawEditions(m);
+  if (view === 'documents') return drawDocuments(m);
   if (view === 'fields') return drawFields(m);
   if (view === 'findings') return drawFindings(m);
   if (view === 'section') return drawSection(m);
@@ -757,6 +792,18 @@ async function drawFindings(m) {
     d.errors
       ? `${d.errors} thing(s) block a build, ${d.findings.length - d.errors} worth a look.`
       : `Nothing blocks a build. ${d.findings.length} thing(s) worth a look.`));
+
+  // Offered above the list, not after it: the point is that most of this does
+  // not need reading one item at a time.
+  if (d.findings.length) {
+    const bar = el('div', 'row'); bar.style.margin = '14px 0';
+    const go = el('button', 'act primary', icon('sparkle') + 'Fix what can be fixed');
+    go.title = 'Applies the mechanical changes, adopts fresh pictures, tidies the ' +
+               'writing, and puts back anything that made the document worse.';
+    go.onclick = fixEverything;
+    bar.append(go);
+    m.append(bar);
+  }
 
   await drawSurvey(m);
 
@@ -1223,6 +1270,65 @@ async function documentPicker() {
   document.body.append(scrim);
   document.addEventListener('keydown', key);
   scrim.onclick = (e) => { if (e.target === scrim) close(); };
+}
+
+/* The same list as a full view, for anyone who never thinks to click a
+   masthead. Two ways in is not duplication here: one is where you are already
+   looking when you want to switch, the other is where you look when you are
+   hunting for a feature you were told exists. */
+async function drawDocuments(m) {
+  m.innerHTML = '';
+  m.append(el('h2', 'page', 'Documents'));
+  m.append(el('div', 'muted',
+    'Every system you document with Verba. A document is a folder with a ' +
+    'content/doc.yaml in it; this is the list of where they are.'));
+
+  let d;
+  try { d = await api('/api/documents'); }
+  catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
+
+  const bar = el('div', 'row'); bar.style.margin = '14px 0';
+  const add = el('button', 'act primary', icon('plus') + 'New document');
+  add.onclick = () => newDocument(d.home);
+  bar.append(add); m.append(bar);
+
+  const panel = el('div', 'panel'); panel.style.padding = '10px';
+  const list = el('div', 'docs'); list.style.marginTop = '0';
+  d.documents.forEach(doc => {
+    const row = el('div', 'docrow' + (doc.current ? ' on' : '') +
+                            (doc.exists ? '' : ' gone'));
+    row.innerHTML =
+      `<div class="dmark">${icon(doc.current ? 'check' : 'document')}</div>
+       <div class="dbody"><div class="dname">${esc(doc.product)}</div>
+         <div class="dpath">${esc(doc.path)}</div></div>`;
+    const acts = el('div', 'row');
+    if (doc.exists && !doc.current) {
+      const open = el('button', 'mini go', 'Open');
+      open.onclick = async () => {
+        try {
+          const r = await api('/api/documents/open', { method: 'POST',
+                                                       json: { path: doc.path } });
+          toast(r.message); view = 'overview'; await refresh();
+        } catch (e) { toast(e.message, true); }
+      };
+      acts.append(open);
+    }
+    if (doc.current) acts.append(el('span', 'muted', 'open now'));
+    if (!doc.exists) acts.append(el('span', 'dgone', 'missing'));
+    if (!doc.current) {
+      const drop = el('button', 'mini', 'Remove');
+      drop.title = 'Takes it off this list. The folder itself is untouched.';
+      drop.onclick = async () => {
+        await api('/api/documents/forget', { method: 'POST', json: { path: doc.path } });
+        drawDocuments(holder());
+      };
+      acts.append(drop);
+    }
+    row.append(acts);
+    list.append(row);
+  });
+  panel.append(list);
+  m.append(panel);
 }
 
 /* Starting one. The same six questions the command line asks, because a person

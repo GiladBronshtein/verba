@@ -26,7 +26,7 @@ KIND_MAP = {
     "fields": "fields",
     "actions": "actions",
     "buttons": "actions",
-    "tabs": None,
+    "tabs": "tabs",
     "labels": "fields",
 }
 

@@ -8,6 +8,7 @@
     verba sweep                  review the crawl and propose the gaps filled
     verba fonts                  which typefaces the outputs are set in
     verba forms                  every form, field and rule the crawl read
+    verba fix                    settle everything the system can, and say what is left
     verba new                    start a new document, without a blank page
     verba themes                 how the document looks
     verba design                 what was decided about how this looks, and why
@@ -694,6 +695,35 @@ def cmd_new(args):
     print("  content/screens.yaml       add the screens worth documenting")
     print("  verba capture              photograph them, and read the labels off the page")
     return 0
+
+
+def cmd_fix(args):
+    """Settle everything the system can settle, and say what is left."""
+    from . import fixer
+    from .history import History
+    from .knowledge import Knowledge
+
+    root = Path(args.root)
+
+    def capture(section_id, log):
+        """Re-photograph one section by running this command's own crawl."""
+        import subprocess
+        import sys
+        r = subprocess.run(
+            [sys.executable, "-m", "verba", "--root", str(root),
+             "capture", "--section", section_id],
+            capture_output=True, text=True)
+        for line in (r.stdout or "").splitlines():
+            log("    " + line)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or r.stdout or "capture failed").strip()[:200])
+
+    out = fixer.run(root, lambda: _project(args), History(root),
+                    Knowledge.load(root), log=print,
+                    rounds=int(args.rounds or 2),
+                    allow_crawl=not args.no_crawl,
+                    capture=capture)
+    return 1 if out["after"]["error"] else 0
 
 
 def cmd_themes(args):
@@ -1395,6 +1425,12 @@ def build_parser() -> argparse.ArgumentParser:
     nw.add_argument("-y", "--yes", action="store_true",
                     help="take every default, ask nothing")
     nw.set_defaults(func=cmd_new)
+
+    fx = sub.add_parser("fix")
+    fx.add_argument("--rounds", help="how many times to go round (default 2)")
+    fx.add_argument("--no-crawl", action="store_true",
+                    help="do not photograph anything, even when that is the fix")
+    fx.set_defaults(func=cmd_fix)
 
     th = sub.add_parser("themes")
     th.add_argument("--use", help="pick one")

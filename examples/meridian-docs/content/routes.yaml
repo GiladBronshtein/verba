@@ -5,41 +5,41 @@
 # capture rebuilds it.
 routes:
   accounts.detail:
-    last_seen: '2026-08-21T20:59:06'
+    last_seen: '2026-08-21T21:15:10'
     reached_by: url
-    seconds: 1.2
+    seconds: 1.1
     sections:
     - accounts.detail
     title: Account detail
     url: http://127.0.0.1:8910/accounts/1
   accounts.list:
-    last_seen: '2026-08-21T20:59:05'
+    last_seen: '2026-08-21T21:15:09'
     reached_by: url
-    seconds: 1.2
+    seconds: 1.1
     sections:
     - accounts.list
     title: Accounts
     url: http://127.0.0.1:8910/accounts
   auth.signin:
-    last_seen: '2026-08-21T20:59:03'
+    last_seen: '2026-08-21T21:15:07'
     reached_by: steps
-    seconds: 1.1
+    seconds: 1.2
     sections:
     - getting-started.signing-in
     title: Sign in
     url: http://127.0.0.1:8910/login
   dashboard:
-    last_seen: '2026-08-21T20:59:04'
+    last_seen: '2026-08-21T21:15:08'
     reached_by: url
-    seconds: 1.1
+    seconds: 1.2
     sections:
     - dashboard.overview
     title: Dashboard
     url: http://127.0.0.1:8910/
   settings.workspace:
-    last_seen: '2026-08-21T20:59:08'
+    last_seen: '2026-08-21T21:15:11'
     reached_by: url
-    seconds: 1.3
+    seconds: 1.1
     sections:
     - settings.workspace
     title: Workspace settings

@@ -228,9 +228,9 @@ class HtmlRenderer:
                     rows.append(f'<div>{req}<span class="name">{_esc(f.get("field",""))}'
                                 f'</span>{typ}{desc}</div>')
                 parts.append(f'<div class="deflist">{"".join(rows)}</div>')
-            elif k in ("actions", "columns"):
-                key = "action" if k == "actions" else "column"
-                cls = "act" if k == "actions" else "col"
+            elif k in ("actions", "columns", "tabs"):
+                key = {"actions": "action", "columns": "column", "tabs": "tab"}[k]
+                cls = {"actions": "act", "columns": "col", "tabs": "tab"}[k]
                 rows = []
                 for it in b.items:
                     desc = f'<span class="sep">:  </span>{_esc(it.get("description",""))}' \

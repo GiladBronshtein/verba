@@ -1,0 +1,26 @@
+{
+  "summary": {
+    "at": "2026-08-21T21:20:19",
+    "gaps": 1,
+    "unwritten": 0,
+    "images": 1,
+    "undocumented": 0,
+    "stale": 0,
+    "redirects": 0,
+    "answerable_now": 0,
+    "screens_worth_crawling": [
+      "home"
+    ]
+  },
+  "gaps": [
+    {
+      "kind": "image",
+      "where": "1.1 Meridian Overview",
+      "what": "this section maps to a screen but shows no picture of it",
+      "screen": "home",
+      "section": "introduction.meridian-overview",
+      "count": 1,
+      "fixable_by_crawl": true
+    }
+  ]
+}

@@ -466,6 +466,82 @@ def t_readonly():
     return "reads pass, writes abort, sign-in is the one logged exception"
 
 
+@check("a real click on Save never reaches a real server")
+def t_readonly_live():
+    """The guarantee, proved against something that records what it receives.
+
+    Checking the guard's own bookkeeping proves the guard agrees with itself.
+    The claim people actually care about is that the product never sees the
+    request, and only a server can answer that, so this stands one up, drives a
+    real browser at it with the guard armed, clicks a button wired to a PUT, and
+    then asks the server what it got.
+    """
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    received: list[str] = []
+
+    PAGE = b"""<!doctype html><html><body>
+    <h1>Account</h1>
+    <button id="save">Save</button>
+    <script>
+      document.getElementById('save').onclick = () => {
+        fetch('/api/accounts/1', {method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({name: 'changed by a stray click'})});
+      };
+    </script></body></html>"""
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(PAGE)))
+            self.end_headers()
+            self.wfile.write(PAGE)
+
+        def _write(self):
+            received.append(f"{self.command} {self.path}")
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_PUT = do_POST = do_PATCH = do_DELETE = _write
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        from playwright.sync_api import sync_playwright
+
+        from verba.readonly import Guard
+        guard = Guard()
+        with sync_playwright() as pw:
+            b = pw.chromium.launch()
+            page = b.new_page()
+            guard.attach(page)
+            guard.lock()                      # sign-in is over; nothing may write
+            page.goto(f"http://127.0.0.1:{port}/accounts/1")
+            page.click("#save")
+            page.wait_for_timeout(700)
+            b.close()
+    except ImportError:
+        raise SkipTest("playwright is not installed")
+    finally:
+        srv.shutdown()
+
+    eq(received, [], "the server was written to: ")
+    ok(guard.blocked, "the write was neither delivered nor recorded as blocked")
+    ok(any("PUT" in x for x in guard.blocked),
+       f"the blocked write was not the PUT: {guard.blocked}")
+    ok(json.dumps(guard.report()), "the guard cannot report what it did")
+    return f"clicked Save; server received nothing; {guard.blocked[0][:44]}..."
+
+
 @check("the content model round-trips")
 def t_model():
     from verba.model import Section, parse_section
@@ -484,7 +560,7 @@ def main() -> int:
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,
-             t_readonly, t_model]
+             t_readonly, t_readonly_live, t_model]
     for t in tests:
         t()
     width = max(len(n) for n, _, _ in results)

@@ -329,7 +329,23 @@ class ConsoleState:
     def job_capture(self, screen_ids: list[str] | None, section_id: str | None = None,
                     mask: bool = True, replay_steps: bool = False, heal: bool = True,
                     sweep: bool = True):
+        # The work is a method rather than a closure so anything else that needs
+        # a capture can have one synchronously. `fix` does: some rule findings
+        # are cleared only by a fresh photograph, and refusing to take one meant
+        # the loop always ended by handing back a job it could have done.
         def run(log):
+            return self.capture_now(screen_ids, section_id, mask, replay_steps,
+                                    heal, sweep, log)
+
+        name = f"capture {section_id}" if section_id else "capture the live system"
+        return self.jobs.start(name, run, detail=", ".join(screen_ids or ["all screens"]))
+
+    def capture_now(self, screen_ids: list[str] | None, section_id: str | None = None,
+                    mask: bool = True, replay_steps: bool = False, heal: bool = True,
+                    sweep: bool = True, log=None):
+        """Crawl now, on this thread, and return the manifest summary."""
+        log = log or (lambda *_: None)
+        if True:
             site, screens = self.screens()
             content = self.root / "content"
             stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
@@ -436,8 +452,6 @@ class ConsoleState:
                     "errors": manifest["errors"], "changes": changes,
                     "readonly": ro, "masking": manifest["masking"],
                     "healing": manifest.get("healing", {})}
-        return self.jobs.start("capture", run,
-                               detail=", ".join(screen_ids or ["all screens"]))
 
     def job_publish(self, formats: list[str], version: str | None, summary: str,
                     force: bool):
@@ -1202,6 +1216,28 @@ class Handler(BaseHTTPRequestHandler):
                 n = Notes.load(st.root)
                 return self.json({"ok": n.reopen(data.get("id", "")),
                                   "message": "back on the list"})
+
+            if path == "/api/fix":
+                # One press, everything the system can settle on its own.
+                #
+                # The pieces existed and each asked for a separate decision:
+                # run the loop, then tidy the writing, then accept the tidy,
+                # then look at the rules again. That is four deliberate acts to
+                # clear findings the system already knew how to clear, and the
+                # honest description of it is homework. What is genuinely a
+                # person's call is handed back at the end, and only that.
+                from .. import fixer
+
+                def _fix(log):
+                    return fixer.run(
+                        st.root, st.reload, st.history, st.knowledge, log=log,
+                        allow_crawl=bool((data or {}).get("crawl", True)),
+                        capture=lambda sid, lg: st.capture_now(
+                            None, sid, mask=True, sweep=False, log=lg))
+
+                job = st.jobs.start("fix what can be fixed", _fix,
+                                    detail="apply, tidy, re-check")
+                return self.json({"ok": True, "job": job.id})
 
             if path == "/api/auto":
                 from ..auto import Auto

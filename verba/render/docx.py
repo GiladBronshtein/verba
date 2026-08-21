@@ -322,8 +322,8 @@ class DocxRenderer:
     def actions(self, items):
         self._labelled(items, "action", self.t.brand_blue)
 
-    def columns(self, items):
-        self._labelled(items, "column", self.t.brand_blue, space=2)
+    def columns(self, items, key: str = "column"):
+        self._labelled(items, key, self.t.brand_blue, space=2)
 
     def terms(self, items):
         for it in items:
@@ -469,6 +469,8 @@ class DocxRenderer:
                     self.actions(block.items)
                 elif k == "columns":
                     self.columns(block.items)
+                elif k == "tabs":
+                    self.columns(block.items, key="tab")
                 elif k == "terms":
                     self.terms(block.items)
                 elif k == "note":

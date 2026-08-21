@@ -1,0 +1,65 @@
+{
+  "decisions": [
+    {
+      "id": "d2a0c617b96ccfa6",
+      "section": "accounts.detail",
+      "verdict": "approved",
+      "line": "removed tab `Audit log`",
+      "reason": "",
+      "at": "2026-08-21T21:26:34",
+      "change": {
+        "kind": "tabs",
+        "change": "removed",
+        "label": "Audit log",
+        "became": "",
+        "screen": "accounts.detail"
+      }
+    },
+    {
+      "id": "38cf595904c3dac4",
+      "section": "accounts.detail",
+      "verdict": "declined",
+      "line": "added tab `Configuration`",
+      "reason": "applying this added a rule finding",
+      "at": "2026-08-21T21:26:34",
+      "change": {
+        "kind": "tabs",
+        "change": "added",
+        "label": "Configuration",
+        "became": "",
+        "screen": "accounts.detail"
+      }
+    },
+    {
+      "id": "bacdab8ef2bd65dc",
+      "section": "accounts.detail",
+      "verdict": "approved",
+      "line": "removed tab `Settings`",
+      "reason": "",
+      "at": "2026-08-21T21:26:35",
+      "change": {
+        "kind": "tabs",
+        "change": "removed",
+        "label": "Settings",
+        "became": "",
+        "screen": "accounts.detail"
+      }
+    },
+    {
+      "id": "6db0ea7d46084c5f",
+      "section": "accounts.list",
+      "verdict": "declined",
+      "line": "added column `OWNER`",
+      "reason": "applying this added a rule finding",
+      "at": "2026-08-21T21:26:35",
+      "change": {
+        "kind": "columns",
+        "change": "added",
+        "label": "OWNER",
+        "became": "",
+        "screen": "accounts.list"
+      }
+    }
+  ],
+  "reversed": []
+}

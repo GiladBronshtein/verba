@@ -1,6 +1,6 @@
 {
-  "at": "2026-08-21T20:54:52",
-  "rounds": 2,
+  "at": "2026-08-21T21:34:11",
+  "rounds": 1,
   "errors_before": 0,
   "errors_after": 0,
   "steps": [
@@ -24,65 +24,11 @@
     },
     {
       "name": "fill the gaps the crawl can answer",
-      "did": "5 section(s) written",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": true,
-      "note": "put back: it added 5 finding(s)",
-      "better": 0
-    },
-    {
-      "name": "fix the writing",
       "did": "",
       "errors_before": 0,
       "errors_after": 0,
       "reverted": false,
       "note": "",
-      "better": 0
-    },
-    {
-      "name": "apply the differences",
-      "did": "",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": false,
-      "note": "",
-      "better": 0
-    },
-    {
-      "name": "use the pictures the crawl took",
-      "did": "",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": false,
-      "note": "",
-      "better": 0
-    },
-    {
-      "name": "do what you asked for",
-      "did": "",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": false,
-      "note": "",
-      "better": 0
-    },
-    {
-      "name": "clear what a failed write left behind",
-      "did": "",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": false,
-      "note": "",
-      "better": 0
-    },
-    {
-      "name": "fill the gaps the crawl can answer",
-      "did": "5 section(s) written",
-      "errors_before": 0,
-      "errors_after": 0,
-      "reverted": true,
-      "note": "put back: it added 5 finding(s)",
       "better": 0
     },
     {

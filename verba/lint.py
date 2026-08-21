@@ -216,7 +216,12 @@ REMEDIES = {
     "ASSET-02":   ("Capture this screen", "capture",
                    "The same image is used for two figures in a row."),
     "ASSET-03":   ("Capture this screen", "capture",
-                   "This picture is already used by another section."),
+                   "Two sections show the same picture, so one of them is "
+                   "illustrated by a screen it does not describe. Either give "
+                   "the second section a screen of its own in "
+                   "content/screens.yaml, or take its figure out and let the "
+                   "text stand alone. Which of the two is a judgement about "
+                   "the document, so nothing decides it for you."),
     "PROFILE-01": ("Edit the section", "open",
                    "A profile variable did not resolve."),
     "PROFILE-02": ("Edit the section", "open",

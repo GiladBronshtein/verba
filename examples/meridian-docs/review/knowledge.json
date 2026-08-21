@@ -1,5 +1,13 @@
 {
-  "updated": "2026-08-21T21:08:04",
-  "terms": {},
+  "updated": "2026-08-21T21:17:46",
+  "terms": {
+    "Every": {
+      "count": 2,
+      "sections": [
+        "introduction",
+        "accounts.detail"
+      ]
+    }
+  },
   "phrasing": []
 }
