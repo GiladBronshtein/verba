@@ -308,7 +308,8 @@ class ConsoleState:
         base = {"section": c.section, "screen": c.screen, "kind": c.kind,
                 "change": c.change, "label": c.label, "became": c.became,
                 "confidence": c.confidence, "note": c.note, "line": c.line(),
-                "applicable": c.change in ("renamed", "added", "removed", "image")}
+                "applicable": c.change in ("renamed", "added", "removed",
+                                          "image", "unmapped")}
         d = self.decisions.verdict_for(base)
         if d:
             base.update({"decided": d.verdict, "decided_reason": d.reason,
@@ -1240,12 +1241,28 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"ok": True, "job": job.id})
 
             if path == "/api/auto":
-                from ..auto import Auto
-                job = st.jobs.start("run everything", lambda log: (
-                    Auto(st.root).run(rounds=int(data.get("rounds") or 3),
-                                      crawl=bool(data.get("crawl", True)),
-                                      log=log)),
-                    detail="crawl, fix, check")
+                # "Run everything" has to mean everything: photograph the whole
+                # document, hold what it says against what came back, and fix
+                # what can be fixed. It used to crawl only the screens a survey
+                # thought would close a gap, so the run you reach for to find
+                # out whether the product moved was the one run that would not
+                # go and look.
+                from .. import fixer
+                d = data or {}
+
+                def _everything(log):
+                    return fixer.run(
+                        st.root, st.reload, st.history, st.knowledge, log=log,
+                        rounds=int(d.get("rounds") or 3),
+                        allow_crawl=bool(d.get("crawl", True)),
+                        full=bool(d.get("crawl", True)),
+                        capture=lambda sid, lg: st.capture_now(
+                            None, sid, mask=True, sweep=False, log=lg),
+                        capture_all=lambda lg: st.capture_now(
+                            None, None, mask=True, sweep=True, log=lg))
+
+                job = st.jobs.start("run everything", _everything,
+                                    detail="photograph every screen, then fix")
                 return self.json({"ok": True, "job": job.id})
 
             if path == "/api/tidy/prepare":

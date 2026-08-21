@@ -358,22 +358,42 @@ class Auto:
             return ""
         decisions = Decisions.load(self.root)
         applied = rejected = 0
+        self._describe_blocked = ""       # why descriptions could not be written
 
         for change in rep.changes:
             c = self._as_dict(change)
             if c.get("change") == "image" or not c.get("applicable"):
                 continue
-            if decisions.verdict_for(c):
+            verdict = decisions.verdict_for(c)
+            # Only a decline stops a change. An approval is permission to make
+            # it, not a record that it was made: a change that is still in the
+            # drift report after being approved never landed, and skipping it
+            # because somebody once said yes is how it stays undone forever.
+            # One such approval here dated from a step that was applied and then
+            # undone, and no run since had looked at it.
+            if (verdict is not None and verdict.binding
+                    and verdict.verdict == "declined"):
                 continue
             before = self._errors()
             snap = self._snapshot()
             if not self._apply_change(c, decisions):
                 continue
             if self._errors() > before:
+                # A control the product gained arrives with no description, and
+                # an unwritten description is itself a finding. Measured alone,
+                # a difference that is exactly right therefore looks worse than
+                # not applying it, so the one change most worth making was the
+                # one change that could never survive. Describe what was just
+                # added, then judge the pair.
+                described = self._describe(c.get("section"), emit)
+                if described and self._errors() <= before:
+                    applied += 1
+                    continue
                 self._restore(snap)
                 try:
                     decisions.record(c, "declined",
-                                     "applying this added a rule finding")
+                                     "applying this added a rule finding",
+                                     by="auto")
                 except Exception:
                     pass
                 rejected += 1
@@ -384,8 +404,90 @@ class Auto:
         if applied:
             bits.append(f"{applied} difference(s) applied")
         if rejected:
-            bits.append(f"{rejected} refused for making the rules worse")
+            # "made the rules worse" is true and unhelpful on its own. The
+            # usual cause is that the change adds a control and there is no way
+            # to reach a model to describe it, which is a thing a person can
+            # act on rather than a verdict about their document.
+            why = self._describe_blocked
+            bits.append(f"{rejected} refused because what they add "
+                        f"cannot be described" + (f" ({why})" if why else ""))
         return ", ".join(bits)
+
+    def _describe(self, section_id, emit) -> bool:
+        """Write the descriptions one section is now missing, from the evidence.
+
+        Run the moment a difference is applied rather than as a later pass,
+        because a later pass is too late: the change has been judged and put
+        back by then.
+
+        This is the `fill_todos` task, which replaces `TODO: describe this.`
+        with a real description and is told to leave the marker alone where the
+        evidence does not support one. It therefore either earns the change its
+        place or fails honestly, and a marker that survives keeps the change
+        out on the next measurement, which is the behaviour we want.
+        """
+        if not section_id:
+            return False
+        from .capture import latest_capture
+        from .console import assist
+        from .decisions import Decisions
+        from .history import History
+        from .knowledge import Knowledge
+        from .lint import lint
+        from .model import parse_section
+
+        ok, why = assist.available()
+        if not ok:
+            self._describe_blocked = why
+            return False
+        try:
+            p = self._project()
+            sec = p.sections.get(section_id)
+            if sec is None:
+                return False
+            inv = self._inventory_for(sec)
+            findings = [{"rule": f.rule, "level": f.level, "message": f.message,
+                         "detail": f.detail}
+                        for f in lint(p) if section_id in (f.section or "")]
+            notes = Knowledge.load(self.root).bundle_for(
+                section_id, Decisions.load(self.root))
+            prompt = assist.build_prompt("fill_todos", p, sec, inv, [],
+                                         findings, notes)
+            result = assist.run_model(prompt, log=None)
+            if not result.ok:
+                self._describe_blocked = (result.error or "")[:120]
+                return False
+            proposed = assist.clean_output(result.output)
+            if not (result.output or "").strip():
+                self._describe_blocked = "the model returned nothing"
+                return False
+            parsed = parse_section(proposed, sec.path)
+            if parsed.id != sec.id:
+                self._describe_blocked = "the reply changed the section id"
+                return False
+            before = sec.path.read_text(encoding="utf-8")
+            if proposed.strip() == before.strip():
+                return False
+            sec.path.write_text(proposed, encoding="utf-8")
+            History(self.root).record(sec.id, sec.path, before, proposed,
+                                      actor="auto", action="describe",
+                                      note="described what the difference added")
+            emit(f"      described what was added to {section_id}")
+            return True
+        except Exception as e:
+            self._describe_blocked = str(e)[:120]
+            emit(f"      could not describe {section_id}: {e}")
+            return False
+
+    def _inventory_for(self, sec) -> dict:
+        """The newest capture of each screen this section is bound to."""
+        try:
+            from .console.server import merged_inventory
+            merged, _ = merged_inventory(self.root / "capture")
+            return {sid: merged["screens"][sid] for sid in sec.screens
+                    if sid in merged.get("screens", {})}
+        except Exception:
+            return {}
 
     def _images(self, emit) -> str:
         from .sweep import Sweep
@@ -481,7 +583,7 @@ class Auto:
     # recognised there and the other way round. `applicable` is not on the
     # change itself: it is a judgement about what can be carried out, and it
     # lived only in the console, so this loop saw None and applied nothing.
-    APPLICABLE = ("renamed", "added", "removed", "image")
+    APPLICABLE = ("renamed", "added", "removed", "image", "unmapped")
 
     def _as_dict(self, change) -> dict:
         if isinstance(change, dict):
@@ -494,6 +596,7 @@ class Auto:
             "label": change.label, "became": change.became,
             "confidence": change.confidence,
             "note": getattr(change, "note", ""), "line": line,
+            "items": list(getattr(change, "items", []) or []),
             "applicable": change.change in self.APPLICABLE,
         }
 

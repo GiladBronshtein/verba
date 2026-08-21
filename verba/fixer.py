@@ -53,12 +53,20 @@ def _needs_capture(project) -> list[str]:
 
 
 def run(root: Path | str, load, history, knowledge, log=None,
-        rounds: int = 2, allow_crawl: bool = True, capture=None) -> dict:
+        rounds: int = 2, allow_crawl: bool = True, capture=None,
+        capture_all=None, full: bool = False) -> dict:
     """Fix what can be fixed. `load` returns a freshly read project.
 
     `capture(section_id, log)` is how a photograph gets taken. It is passed in
     rather than imported, because the console and the command line each already
     know how to crawl and neither should learn the other's way of doing it.
+
+    `full` photographs every screen in the registry before anything else, which
+    is what "run everything" has to mean. It used to crawl only the screens a
+    survey thought would close a gap, so a document with no known gaps was told
+    "the last crawl still answers everything" and nothing was looked at: the one
+    run you reach for to find out whether the product moved was the one run that
+    would not go and look.
     """
     emit = log or (lambda *_: None)
     root = Path(root)
@@ -66,10 +74,23 @@ def run(root: Path | str, load, history, knowledge, log=None,
     from .tidy import Tidy
 
     before = summarise(lint(load()))
+    swept = False
 
     def settle(crawl: bool):
         Auto(root).run(rounds=rounds, crawl=crawl, log=emit)
 
+    if full and allow_crawl and capture_all is not None:
+        emit("photographing every screen in the document")
+        try:
+            capture_all(emit)
+            swept = True
+        except Exception as e:
+            emit(f"  the crawl could not run: {e}")
+            emit("  carrying on with the last capture")
+        emit("")
+
+    # The rounds never crawl here: either the sweep above just did, or this is
+    # a fix rather than a full run.
     settle(crawl=False)
 
     emit("")
@@ -106,6 +127,10 @@ def run(root: Path | str, load, history, knowledge, log=None,
 
     after = summarise(lint(load()))
     left = [f for f in lint(load()) if f.level == "error"]
+    if swept:
+        emit("")
+        emit("every screen was photographed, so what the document says was "
+             "checked against the product as it is now")
     emit("")
     emit(f"findings: {before['error']} error to {after['error']} error, "
          f"{before['warning']} warning to {after['warning']} warning")
@@ -124,5 +149,6 @@ def run(root: Path | str, load, history, knowledge, log=None,
             if r.get("label"):
                 emit(f"      -> {r['label']}")
     return {"before": before, "after": after, "recaptured": crawled,
+            "full_crawl": swept,
             "left": [{"rule": f.rule, "section": f.section, "message": f.message}
                      for f in left]}

@@ -9,6 +9,7 @@
     verba fonts                  which typefaces the outputs are set in
     verba forms                  every form, field and rule the crawl read
     verba fix                    settle everything the system can, and say what is left
+    verba fix --full             photograph every screen first, then do that
     verba new                    start a new document, without a blank page
     verba themes                 how the document looks
     verba design                 what was decided about how this looks, and why
@@ -705,16 +706,15 @@ def cmd_fix(args):
 
     root = Path(args.root)
 
-    def capture(section_id, log):
-        """Re-photograph one section by running this command's own crawl."""
+    def _crawl(*more):
+        """Run this command's own capture, streaming it where the person is."""
         import subprocess
         import sys
         r = subprocess.run(
-            [sys.executable, "-m", "verba", "--root", str(root),
-             "capture", "--section", section_id],
+            [sys.executable, "-m", "verba", "--root", str(root), "capture", *more],
             capture_output=True, text=True)
         for line in (r.stdout or "").splitlines():
-            log("    " + line)
+            print("    " + line)
         if r.returncode != 0:
             raise RuntimeError((r.stderr or r.stdout or "capture failed").strip()[:200])
 
@@ -722,7 +722,9 @@ def cmd_fix(args):
                     Knowledge.load(root), log=print,
                     rounds=int(args.rounds or 2),
                     allow_crawl=not args.no_crawl,
-                    capture=capture)
+                    full=args.full and not args.no_crawl,
+                    capture=lambda sid, log: _crawl("--section", sid),
+                    capture_all=lambda log: _crawl())
     return 1 if out["after"]["error"] else 0
 
 
@@ -1430,6 +1432,8 @@ def build_parser() -> argparse.ArgumentParser:
     fx.add_argument("--rounds", help="how many times to go round (default 2)")
     fx.add_argument("--no-crawl", action="store_true",
                     help="do not photograph anything, even when that is the fix")
+    fx.add_argument("--full", action="store_true",
+                    help="photograph every screen first, then fix against it")
     fx.set_defaults(func=cmd_fix)
 
     th = sub.add_parser("themes")

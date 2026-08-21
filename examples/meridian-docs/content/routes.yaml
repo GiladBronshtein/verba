@@ -5,7 +5,7 @@
 # capture rebuilds it.
 routes:
   accounts.detail:
-    last_seen: '2026-08-21T21:15:10'
+    last_seen: '2026-08-22T01:10:31'
     reached_by: url
     seconds: 1.1
     sections:
@@ -13,7 +13,7 @@ routes:
     title: Account detail
     url: http://127.0.0.1:8910/accounts/1
   accounts.list:
-    last_seen: '2026-08-21T21:15:09'
+    last_seen: '2026-08-22T01:10:30'
     reached_by: url
     seconds: 1.1
     sections:
@@ -21,23 +21,23 @@ routes:
     title: Accounts
     url: http://127.0.0.1:8910/accounts
   auth.signin:
-    last_seen: '2026-08-21T21:15:07'
+    last_seen: '2026-08-22T01:10:28'
     reached_by: steps
-    seconds: 1.2
+    seconds: 1.1
     sections:
     - getting-started.signing-in
     title: Sign in
     url: http://127.0.0.1:8910/login
   dashboard:
-    last_seen: '2026-08-21T21:15:08'
+    last_seen: '2026-08-22T01:10:29'
     reached_by: url
-    seconds: 1.2
+    seconds: 1.1
     sections:
     - dashboard.overview
     title: Dashboard
     url: http://127.0.0.1:8910/
   settings.workspace:
-    last_seen: '2026-08-21T21:15:11'
+    last_seen: '2026-08-22T01:10:32'
     reached_by: url
     seconds: 1.1
     sections:

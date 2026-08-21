@@ -466,6 +466,82 @@ def t_readonly():
     return "reads pass, writes abort, sign-in is the one logged exception"
 
 
+@check("an approval is permission, not a record that it was applied")
+def t_approval_is_permission():
+    """A change approved but never landed must not be skipped forever.
+
+    One in the real document was approved by a step that was then undone, so
+    the record said yes and the document said nothing, and every run since had
+    skipped it. Only a decline stops a change being made.
+    """
+    import inspect as _i
+
+    from verba.auto import Auto
+    from verba.decisions import Decisions
+
+    root = fresh()
+    d = Decisions.load(root)
+    change = {"section": "s", "kind": "fields", "change": "added",
+              "label": "Widget", "screen": "x"}
+    d.record(change, "approved", "")
+    v = Decisions.load(root).verdict_for(change)
+    ok(v is not None, "the approval was not stored")
+    eq(v.verdict, "approved", "wrong verdict: ")
+
+    src = _i.getsource(Auto._drift)
+    ok('verdict.verdict == "declined"' in src,
+       "the loop still skips a change merely because somebody approved it")
+    return "approved but unlanded changes are applied"
+
+
+@check("the system's own retreat is not a person's ruling")
+def t_auto_decline_is_not_binding():
+    """A decline the machine made under yesterday's abilities is reconsidered
+    when those change. A person's decline is not."""
+    from verba.decisions import Decisions
+
+    root = fresh()
+    d = Decisions.load(root)
+    mine = {"section": "s", "kind": "fields", "change": "added",
+            "label": "Mine", "screen": "x", "line": "added field `Mine`"}
+    theirs = {"section": "s", "kind": "fields", "change": "added",
+              "label": "Theirs", "screen": "x", "line": "added field `Theirs`"}
+    d.record(mine, "declined", "applying this added a rule finding", by="auto")
+    d.record(theirs, "declined", "we do not document this", by="human")
+
+    again = Decisions.load(root)
+    ok(not again.verdict_for(mine).binding,
+       "the machine's own decline is being treated as binding")
+    ok(again.verdict_for(theirs).binding,
+       "a person's decline stopped being binding")
+
+    notes = again.notes_for("s")
+    ok("Theirs" in notes, "the person's decision is not passed to the writer")
+    ok("Mine" not in notes,
+       "the machine's own retreat is quoted back as a human ruling")
+    return "auto declines are reconsidered, human declines bind"
+
+
+@check("a difference and the description it needs are judged together")
+def t_apply_and_describe_are_one_step():
+    """Applying a difference that adds a control creates an entry with no
+    description, and an unwritten description is itself a finding. Measured on
+    its own, the change that is exactly right looks worse than not making it."""
+    import inspect as _i
+
+    from verba.auto import Auto
+
+    src = _i.getsource(Auto._drift)
+    ok("_describe(" in src,
+       "an applied difference is judged before what it added is described")
+    desc = _i.getsource(Auto._describe)
+    ok("fill_todos" in desc,
+       "describing runs something other than the task that fills TODOs")
+    ok("available()" in desc,
+       "a missing model is not reported, so the refusal has no reason")
+    return "apply, describe, then measure"
+
+
 @check("a real click on Save never reaches a real server")
 def t_readonly_live():
     """The guarantee, proved against something that records what it receives.
@@ -560,6 +636,8 @@ def main() -> int:
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,
+             t_approval_is_permission, t_auto_decline_is_not_binding,
+             t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_model]
     for t in tests:
         t()

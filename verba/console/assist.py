@@ -176,14 +176,34 @@ def backends() -> list[dict]:
 
     exe = os.environ.get("VERBA_CLAUDE", "claude")
     path = shutil.which(exe)
-    out.append({
-        "id": "cli", "label": "Claude Code CLI", "ready": bool(path),
-        "note": (f"{path}. Works from an ordinary terminal: a nested call blocks when "
-                 f"the console is started from inside another Claude Code session."
-                 if path else
-                 f"{exe!r} not found. Install Claude Code or set VERBA_CLAUDE."),
-    })
+    nested = inside_claude_code()
+    if not path:
+        note, ready = (f"{exe!r} not found. Install Claude Code or set "
+                       f"VERBA_CLAUDE."), False
+    elif nested:
+        # Knowing this in advance matters more than it looks. Without it the
+        # call is still made, blocks, and is only abandoned when the timeout
+        # expires: an unattended run then spends four minutes per section
+        # discovering the same thing over and over, and looks like a hang.
+        note, ready = ("this console was started from inside another Claude Code "
+                       "session, where a nested call cannot return. Start it from "
+                       "an ordinary terminal, or use the gateway."), False
+    else:
+        note, ready = (f"{path}. Works from an ordinary terminal."), True
+    out.append({"id": "cli", "label": "Claude Code CLI",
+                "ready": ready, "note": note})
     return out
+
+
+def inside_claude_code() -> bool:
+    """Is this process running inside a Claude Code session?
+
+    The CLI cannot be invoked from within one: the nested call waits for a
+    session that is itself waiting for this one.
+    """
+    return bool(os.environ.get("CLAUDECODE")
+                or os.environ.get("CLAUDE_CODE_ENTRYPOINT")
+                or os.environ.get("CLAUDE_AGENT_SDK_VERSION"))
 
 
 def available() -> tuple[bool, str]:
@@ -303,6 +323,12 @@ def run_model(prompt: str, system: str | None = None,
             return _run_litellm(prompt, system, timeout)
         if chosen == "api":
             return _run_api(prompt, system, timeout)
+        if inside_claude_code():
+            return AssistResult(
+                False, backend="cli",
+                error="the Claude Code CLI cannot be called from inside a Claude "
+                      "Code session. Start the console from an ordinary terminal, "
+                      "or configure a gateway under assist: in content/doc.yaml.")
         return _run_cli(prompt, system, timeout)
     except subprocess.TimeoutExpired:
         return AssistResult(False, backend=chosen, error=(

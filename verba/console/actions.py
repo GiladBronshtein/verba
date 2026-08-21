@@ -117,6 +117,21 @@ def apply_change(project, change: dict, capture_dir: Path | None) -> str:
         return apply_add(section, kind, label)
     if kind_of == "removed":
         return apply_remove(section, kind, label)
+    if kind_of == "unmapped":
+        # The screen shows a set of controls and the section names none of them.
+        # The crawl brought the labels, so write them; the descriptions are
+        # filled from the evidence immediately afterwards, and the pair is
+        # judged together rather than the write being judged on its own.
+        labels = [str(x) for x in (change.get("items") or []) if str(x).strip()]
+        if not labels:
+            return "nothing was observed to write"
+        written = 0
+        for lab in labels:
+            note = apply_add(section, kind, lab)
+            section = load_section(section.path)
+            if note.startswith("added"):
+                written += 1
+        return f"documented {written} {kind} the screen shows"
     if kind_of == "image":
         if capture_dir is None:
             return "no capture available to take the image from"

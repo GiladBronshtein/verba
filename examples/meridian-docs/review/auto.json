@@ -1,6 +1,6 @@
 {
-  "at": "2026-08-21T21:34:11",
-  "rounds": 1,
+  "at": "2026-08-22T01:10:51",
+  "rounds": 2,
   "errors_before": 0,
   "errors_after": 0,
   "steps": [
@@ -42,7 +42,61 @@
     },
     {
       "name": "apply the differences",
+      "did": "7 refused because what they add cannot be described (no way to reach a model. Set ANTHROPIC_API_KEY, or install the Claude Code CLI.)",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "use the pictures the crawl took",
       "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "do what you asked for",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "clear what a failed write left behind",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "fill the gaps the crawl can answer",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "fix the writing",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "apply the differences",
+      "did": "7 refused because what they add cannot be described (no way to reach a model. Set ANTHROPIC_API_KEY, or install the Claude Code CLI.)",
       "errors_before": 0,
       "errors_after": 0,
       "reverted": false,

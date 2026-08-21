@@ -2,7 +2,8 @@
 id: accounts.list
 title: Accounts List
 status: draft
-screens: [accounts.list]
+screens:
+- accounts.list
 ---
 
 Every account in the workspace, searchable and filterable by status.
@@ -18,6 +19,7 @@ Every account in the workspace, searchable and filterable by status.
   description: Starter, Growth or Scale
 - column: Status
   description: Live, On hold or Disabled
+- column: OWNER
 ```
 
 Filter the list with the status buttons above the table.

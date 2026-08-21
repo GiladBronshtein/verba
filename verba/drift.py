@@ -44,6 +44,9 @@ class Change:
     became: str = ""
     confidence: float = 1.0
     note: str = ""
+    # What the live screen showed. An "the section documents none" item is only
+    # actionable if it brings the labels along; without them it is a complaint.
+    items: list = field(default_factory=list)
 
     def line(self) -> str:
         if self.change == "renamed":
@@ -191,7 +194,8 @@ def analyse(project, capture_dir: Path, staleness_days: int = 120,
                     rep.changes.append(Change(
                         owner, screen_id, target, "unmapped", confidence=0.5,
                         note=f"live screen exposes {len(observed)} {cap_kind} "
-                             f"but the section documents none"))
+                             f"but the section documents none",
+                        items=list(observed)))
                     continue
                 missing, extra, renames = _match_lists(dec, observed)
                 for m in missing:

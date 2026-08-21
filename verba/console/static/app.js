@@ -560,18 +560,21 @@ function drawOverview(m) {
   };
   // The whole loop, first, because it is what most days need.
   const autoBtn = b(icon('play') + 'Run everything', 'primary', () => modal({
-    title: 'Run the whole pipeline?',
-    body: '<p>It crawls what the document is missing, fills the gaps the crawl '
-        + 'can answer, fixes the writing, applies the differences and uses the '
-        + 'pictures it took.</p>'
+    title: 'Photograph every screen, then fix what can be fixed?',
+    body: '<p>It signs in and photographs <b>every screen in the document</b>, '
+        + 'watch it happen as it goes. Then it holds what the document says '
+        + 'against what came back: applies the differences, fills the gaps the '
+        + 'evidence can answer, fixes the writing, and adopts the new pictures.</p>'
         + '<p class="muted">Every step is measured, and anything that makes the '
-        + 'rule findings worse is put straight back. Nothing is written to the '
-        + 'platform, and every change is in History.</p>',
+        + 'rule findings worse is put straight back. Whatever is genuinely your '
+        + 'call is listed at the end with the reason. Nothing is written to the '
+        + 'platform, and every change is in History.</p>'
+        + '<p class="muted">On a large document this takes a few minutes.</p>',
     confirmLabel: 'Run it', confirmClass: 'primary',
     onConfirm: () => runJob('/api/auto', { rounds: 3, crawl: true }, 'run everything'),
   }));
-  autoBtn.title = 'Crawl, fill the gaps, fix the writing, apply the differences, '
-                + 'and stop only where you are needed';
+  autoBtn.title = 'Photograph every screen, apply the differences, fix the '
+                + 'writing, and stop only where you are needed';
   const capBtn = b(icon('camera') + 'Capture the live system', '', () => runCapture(null));
   const act = ((S.environments || {}).items || []).find(x => x.active);
   if (!act || !act.ready) {

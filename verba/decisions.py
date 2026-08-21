@@ -43,6 +43,13 @@ def fingerprint(change: dict) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
 
+# Reasons only the system ever gives itself. Used to read older records, which
+# predate the field that says who decided.
+AUTO_REASONS = {
+    "applying this added a rule finding",
+}
+
+
 @dataclass
 class Decision:
     id: str
@@ -52,6 +59,17 @@ class Decision:
     reason: str = ""
     at: str = ""
     change: dict = field(default_factory=dict)
+    # Who decided. A person's decline is binding; the system's is a note to
+    # itself, made under whatever it could do that day, and has to be
+    # reconsidered when that changes. Conflating the two meant a change the
+    # system declined because it could not yet describe an added control was
+    # then quoted back to the writer as "reviewed by a person and must be
+    # respected", and no later run would look at it again.
+    by: str = "human"            # human | auto
+
+    @property
+    def binding(self) -> bool:
+        return self.by != "auto"
 
     def to_dict(self) -> dict:
         return self.__dict__.copy()
@@ -75,7 +93,15 @@ class Decisions:
                 entries = raw.get("decisions", []) if isinstance(raw, dict) else raw
                 rev = raw.get("reversed", []) if isinstance(raw, dict) else []
                 for d in entries:
-                    items[d["id"]] = Decision(**d)
+                    # Records written before `by` existed. The system's own
+                    # retreats are identifiable by the reason it gives itself,
+                    # and reading them as human rulings would keep them binding
+                    # forever.
+                    if "by" not in d:
+                        d["by"] = ("auto" if d.get("reason", "") in AUTO_REASONS
+                                   else "human")
+                    items[d["id"]] = Decision(**{k: v for k, v in d.items()
+                                                 if k in Decision.__annotations__})
             except Exception:
                 items, rev = {}, []
         return cls(root=root, items=items, reversed_=rev)
@@ -89,7 +115,8 @@ class Decisions:
         }, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # ------------------------------------------------------------------
-    def record(self, change: dict, verdict: str, reason: str = "") -> Decision:
+    def record(self, change: dict, verdict: str, reason: str = "",
+               by: str = "human") -> Decision:
         if verdict == DECLINED and not reason.strip():
             raise ValueError("declining a change needs a reason: the next crawl "
                              "reads it, and so does the writing assistant")
@@ -102,6 +129,7 @@ class Decisions:
             at=datetime.now().isoformat(timespec="seconds"),
             change={k: change.get(k) for k in
                     ("kind", "change", "label", "became", "screen")},
+            by=by,
         )
         self.items[d.id] = d
         self.save()
@@ -133,13 +161,16 @@ class Decisions:
     def verdict_for(self, change: dict) -> Decision | None:
         return self.items.get(fingerprint(change))
 
-    def declined_for(self, section_id: str) -> list[Decision]:
+    def declined_for(self, section_id: str, binding_only: bool = False) -> list[Decision]:
         return [d for d in self.items.values()
-                if d.section == section_id and d.verdict == DECLINED]
+                if d.section == section_id and d.verdict == DECLINED
+                and (d.binding or not binding_only)]
 
     def notes_for(self, section_id: str) -> str:
         """The standing instructions for a section, for the model to obey."""
-        declined = self.declined_for(section_id)
+        # Only what a person actually decided. Telling the model that the
+        # system's own retreat was a human ruling makes it defend a gap.
+        declined = self.declined_for(section_id, binding_only=True)
         if not declined:
             return ""
         lines = ["Decisions already made about this section. These were reviewed "
