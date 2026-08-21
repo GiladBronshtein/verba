@@ -120,6 +120,29 @@ def t_scaffold_refuses():
     return "unknown theme and unknown sign-in both refused"
 
 
+@check("a command finds the project you are standing in")
+def t_find_root():
+    """The default project root was the package's own parent directory.
+
+    Correct for exactly as long as the engine lived inside the single project it
+    served. Installed from a package it points at site-packages, so `verba
+    build` run in your own project goes looking for someone else's document.
+    """
+    from verba.cli import find_root
+
+    d = fresh()
+    eq(find_root(d), d.resolve(), "the project root was not found from its own root: ")
+    deep = d / "content" / "sections"
+    eq(find_root(deep), d.resolve(), "not found from a subdirectory: ")
+
+    # nowhere near a project: fall back to where you are, not to the package
+    bare = Path(tempfile.mkdtemp()).resolve()
+    eq(find_root(bare), bare, "outside a project the answer should be here: ")
+    ok(Path(__file__).resolve().parent.parent != find_root(deep),
+       "the engine's own directory is being used as a project root")
+    return "found from the root, from a subdirectory, and outside one"
+
+
 # ── themes ───────────────────────────────────────────────────────────────────
 
 def _ratio(a: str, b: str) -> float:
@@ -456,7 +479,8 @@ def t_model():
 # ── run ──────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    tests = [t_scaffold_builds, t_scaffold_refuses, t_themes_contrast,
+    tests = [t_scaffold_builds, t_scaffold_refuses, t_find_root,
+             t_themes_contrast,
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,

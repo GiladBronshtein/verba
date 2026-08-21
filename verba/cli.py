@@ -56,7 +56,25 @@ from .render.docx import DocxRenderer
 from .render.html import HtmlRenderer
 from .version import ReleaseStore, output_name
 
-ROOT = Path(__file__).resolve().parent.parent
+def find_root(start: Path | None = None) -> Path:
+    """The project you are standing in.
+
+    Walks up from the working directory looking for content/doc.yaml, the way
+    git looks for .git, so any command works from anywhere inside a project.
+
+    This used to be the package's own parent directory, which was right for
+    exactly as long as the engine lived inside the single project it served.
+    Installed from a package it pointed at site-packages, so `verba build` in
+    your own project went looking for someone else's document.
+    """
+    here = (start or Path.cwd()).resolve()
+    for d in (here, *here.parents):
+        if (d / "content" / "doc.yaml").exists():
+            return d
+    return here
+
+
+ROOT = find_root()
 
 
 def _project(args) -> Project:
