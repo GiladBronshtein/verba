@@ -1,0 +1,14 @@
+label: Forest
+about: >
+  Deep green, low saturation. Calm and unbranded, which is what you want when
+  the document is about infrastructure or operations rather than about a product
+  someone is selling.
+font: Source Sans 3
+navy_hero: "14261C"
+navy_deep: "112018"
+brand_blue: "1B6B3A"
+lavender: "E6F3EA"
+periwinkle: "4ADE80"
+note_accent:
+  Important: "B3261E"
+  Warning: "B3261E"

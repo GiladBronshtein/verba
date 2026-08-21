@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verba-docs"
+version = "1.0.0"
+description = "Technical documentation built from the running system, not from memory."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Gilad Bronshtein" }]
+keywords = ["documentation", "technical-writing", "playwright", "docx", "screenshots"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Documentation",
+]
+dependencies = [
+  "PyYAML>=6.0",
+  "Jinja2>=3.1",
+  "python-docx>=1.1",
+  "playwright>=1.44",
+  "Pillow>=10.0",
+  "pypdf>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.5"]
+
+[project.urls]
+Homepage = "https://github.com/GiladBronshtein/verba"
+Issues = "https://github.com/GiladBronshtein/verba/issues"
+
+[project.scripts]
+verba = "verba.cli:main"
+
+[tool.setuptools]
+packages = ["verba", "verba.console", "verba.render"]
+
+[tool.setuptools.package-data]
+verba = ["console/static/*"]
+
+[tool.ruff]
+line-length = 100

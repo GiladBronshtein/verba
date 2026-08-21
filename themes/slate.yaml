@@ -1,0 +1,14 @@
+label: Slate
+about: >
+  The neutral default. Indigo accent on near-black text, cool grey panels.
+  Reads as a manual rather than as a brochure, and gets out of the way of
+  screenshots, which are the loudest thing on any page of a product document.
+font: Inter
+navy_hero: "16203A"
+navy_deep: "1B2549"
+brand_blue: "3137DB"
+lavender: "EBEFFC"
+periwinkle: "5E97FF"
+note_accent:
+  Important: "C62828"
+  Warning: "C62828"

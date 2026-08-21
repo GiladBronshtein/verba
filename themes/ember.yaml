@@ -1,0 +1,13 @@
+label: Ember
+about: >
+  Warm charcoal with a burnt amber accent. Softer than the blues without being
+  informal. Good for onboarding and training material that people read once.
+font: Inter
+navy_hero: "292524"
+navy_deep: "1C1917"
+brand_blue: "9A5B06"
+lavender: "FBF1E3"
+periwinkle: "F59E0B"
+note_accent:
+  Important: "9F1239"
+  Warning: "9F1239"

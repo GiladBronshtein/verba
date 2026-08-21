@@ -1,0 +1,823 @@
+/* Verba console.
+ *
+ * Dark-first, because this is a tool that sits open beside the work. The palette
+ * is anchored on the Rise navy and blue, lifted to meet contrast on a dark
+ * ground: #3137DB is the brand mark, but as text on near-black it fails at
+ * 4.5:1, so a lighter sibling carries interactive text and the true brand blue
+ * carries fills and the active rail.
+ *
+ * Density is dashboard-grade: an 8px scale, not a marketing 24px one.
+ */
+
+/* The families are set on :root by /static/fonts.css, which the server
+   generates from content/typography.yaml. These are the fallbacks that apply
+   before it lands, and if it ever fails to. */
+:root{
+  --font-body: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-track: normal;
+}
+
+:root {
+  /* ground: never pure black, which smears on OLED and kills depth cues */
+  --bg: #0A0D18;
+  --surface: #10152449;
+  --panel: #141A2E;
+  --panel-2: #1A2138;
+  --rail: #0D1120;
+
+  --line: #232B45;
+  --line-soft: #1B2136;
+
+  --text: #E9EDFA;
+  --text-2: #A6B0D0;
+  --text-3: #808BAF;   /* 5.12:1 on --panel; #737E9F measured 4.28 and failed AA */
+
+  /* brand */
+  --brand: #3137DB;          /* fills, the active rail, never small text */
+  --brand-lift: #7C93FF;     /* interactive text and icons on dark */
+  --brand-soft: #1B2150;
+  --lav: #EBEFFC;
+
+  --ok: #34D399;
+  --warn: #FBBF24;
+  --bad: #FB7185;
+  --ok-soft: #0F2A22;
+  --warn-soft: #2C2413;
+  --bad-soft: #2E1620;
+
+  /* 8px scale */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px;
+
+  --r1: 6px; --r2: 10px; --r3: 14px;
+  --rail-w: 264px;
+
+  --mono: var(--font-mono);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --fast: 160ms var(--ease);
+
+  /* drawn here rather than per select, so both themes stay in step */
+  --chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23808BAF' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  --glow: 0 0 0 1px rgba(124,147,255,.25), 0 0 24px -6px rgba(49,55,219,.55);
+}
+
+/* Light is a deliberate secondary. Same tokens, inverted roles. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #F6F7FC; --surface: #FFFFFF; --panel: #FFFFFF; --panel-2: #F3F5FC;
+    --rail: #FFFFFF;
+    --line: #DFE4F4; --line-soft: #EDF0FA;
+    --text: #131A30; --text-2: #4A5578; --text-3: #626D91;  /* 5.1:1 on white; #7A85A6 measured 3.66 */
+    --brand-lift: #2B31C4; --brand-soft: #E7EAFF;
+    --chevron: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23626D91' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    /* measured against their own soft chip backgrounds, not against white */
+    --ok: #0B7350; --warn: #8A5406; --bad: #AE2A42;
+    --ok-soft: #E6F7F0; --warn-soft: #FDF5E3; --bad-soft: #FDECEF;
+    --shadow: 0 1px 2px rgba(16,24,64,.06), 0 8px 24px -14px rgba(16,24,64,.22);
+    --glow: 0 0 0 1px rgba(49,55,219,.22), 0 0 20px -8px rgba(49,55,219,.35);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 14px/1.55 var(--font-body);
+  letter-spacing: var(--font-track);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+
+select {
+  appearance: none; -webkit-appearance: none;
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px;
+  padding-right: 34px;
+  cursor: pointer;
+}
+select::-ms-expand { display: none; }
+button { cursor: pointer; }
+a { color: var(--brand-lift); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible {
+  outline: 2px solid var(--brand-lift);
+  outline-offset: 2px;
+  border-radius: var(--r1);
+}
+
+.ic { flex: none; fill: none; stroke: currentColor; stroke-width: 1.7;
+      stroke-linecap: round; stroke-linejoin: round; }
+
+/* ─────────────────────────────────────────────── shell */
+
+.app {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  height: 100vh;
+}
+
+aside {
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  min-height: 0; min-width: 0;
+}
+
+.brand {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s3);
+}
+.brand .mark {
+  width: 32px; height: 32px; border-radius: 9px; flex: none;
+  background: linear-gradient(150deg, var(--brand) 0%, #5B62FF 100%);
+  display: grid; place-items: center; color: #fff;
+  box-shadow: var(--glow);
+}
+.brand .who { min-width: 0; }
+.brand h1 {
+  margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand .sub { color: var(--text-3); font-size: 12px; }
+
+.edition { padding: 0 var(--s4) var(--s3); }
+.edition select {
+  width: 100%; padding: 7px var(--s3); border-radius: var(--r2);
+  border: 1px solid var(--line); color: var(--text);
+  background-color: var(--panel);
+  transition: border-color var(--fast);
+}
+.edition select:hover { border-color: var(--brand-lift); }
+
+/* primary navigation: a vertical list, so it never wraps into two ragged rows */
+.nav { padding: 0 var(--s2) var(--s3); display: grid; gap: 2px; }
+.nav button {
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%; padding: 8px var(--s3); border: 0; border-radius: var(--r2);
+  background: transparent; color: var(--text-2); font-size: 13.5px;
+  text-align: left; position: relative;
+  transition: background var(--fast), color var(--fast);
+}
+.nav button:hover { background: var(--panel); color: var(--text); }
+.nav button.on { background: var(--brand-soft); color: var(--text); font-weight: 500; }
+.nav button.on::before {
+  content: ''; position: absolute; left: -8px; top: 50%; translate: 0 -50%;
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--brand);
+}
+.nav .count {
+  margin-left: auto; font-size: 12px; font-weight: 600;
+  color: var(--bad); background: var(--bad-soft);
+  padding: 1px 7px; border-radius: 99px;
+}
+.nav .spacer { height: var(--s3); }
+
+.tree {
+  flex: 1; min-height: 0; overflow: auto;
+  padding: var(--s2) var(--s2) var(--s6);
+  border-top: 1px solid var(--line-soft);
+}
+.tree .head {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--text-3); padding: var(--s3) var(--s3) var(--s2); font-weight: 600;
+}
+.tree .row {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: 5px var(--s3); border-radius: var(--r1); cursor: pointer;
+  font-size: 13px; color: var(--text-2); position: relative;
+  transition: background var(--fast), color var(--fast);
+}
+.tree .row:hover { background: var(--panel); color: var(--text); }
+.tree .row.on { background: var(--brand-soft); color: var(--text); }
+/* the tinted active background lifts the floor, so the muted number needs a step up */
+.tree .row.on .n { color: var(--text-2); }
+.tree .row .n {
+  color: var(--text-3); font: 500 11px var(--mono);
+  min-width: 30px; font-variant-numeric: tabular-nums;
+}
+.tree .row .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree .row.l1 { font-weight: 600; color: var(--text); margin-top: var(--s3); }
+.tree .row.l1 .n { color: var(--brand-lift); }
+.tree .row.l3 .t { padding-left: var(--s3); font-size: 12.5px; }
+.tree .row .flag {
+  font-size: 12px; font-weight: 700; color: var(--bad);
+  background: var(--bad-soft); padding: 0 5px; border-radius: 99px;
+}
+
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--text-3); }
+.dot.verified { background: var(--ok); }
+.dot.stale    { background: var(--bad); }
+.dot.draft    { background: var(--warn); }
+.dot.review   { background: var(--brand-lift); }
+
+/* ─────────────────────────────────────────────── main */
+
+main { overflow: auto; min-width: 0; padding: var(--s5) var(--s6) var(--s7); }
+.hold { max-width: 1080px; }
+
+.page-head { margin-bottom: var(--s5); }
+h2.page {
+  margin: 0 0 var(--s1); font-size: 22px; font-weight: 600; letter-spacing: -.02em;
+}
+.muted { color: var(--text-3); font-size: 13px; }
+.muted a { color: var(--brand-lift); }
+
+/* stat strip: one band, not six floating boxes */
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r3); overflow: hidden; margin-bottom: var(--s4);
+}
+.stats .cell { padding: var(--s3) var(--s4); border-right: 1px solid var(--line-soft); }
+.stats .cell:last-child { border-right: 0; }
+.stats .v { font-size: 22px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2; }
+.stats .k {
+  color: var(--text-3); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .07em; margin-top: 2px;
+}
+.stats .cell.bad .v { color: var(--bad); }
+.stats .cell.warn .v { color: var(--warn); }
+.stats .cell.good .v { color: var(--ok); }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r3); padding: var(--s4) var(--s5); margin: var(--s4) 0;
+  box-shadow: var(--shadow);
+}
+.panel > h3 {
+  margin: 0 0 var(--s3); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: var(--s2); letter-spacing: -.01em;
+}
+.panel > h3 .ic { color: var(--brand-lift); }
+.panel.accent { border-color: var(--brand); }
+.panel.warn-edge { border-color: var(--warn); }
+
+.row { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s3); }
+
+/* ─────────────────────────────────────────────── controls */
+
+button.act {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px var(--s3); border-radius: var(--r2);
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+  font-size: 13px; font-weight: 500;
+  transition: border-color var(--fast), background var(--fast), color var(--fast);
+}
+button.act:hover:not(:disabled) { border-color: var(--brand-lift); color: var(--brand-lift); }
+button.act .ic { color: currentColor; }
+button.act.primary {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset;
+}
+button.act.primary:hover:not(:disabled) { background: #3B42EE; border-color: #3B42EE; color: #fff; }
+button.act.ghost { background: transparent; border-style: dashed; color: var(--text-2); }
+button.act.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+button.act:disabled { opacity: .42; cursor: not-allowed; }
+
+button.mini {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 10px; font-size: 12.5px; border-radius: var(--r1);
+  min-height: 30px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text-2);
+  transition: border-color var(--fast), color var(--fast);
+}
+button.mini:hover:not(:disabled) { border-color: var(--brand-lift); color: var(--brand-lift); }
+button.mini.go:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); }
+button.mini:disabled { opacity: .42; cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label {
+  color: var(--text-3); font-size: 12px; text-transform: uppercase;
+  letter-spacing: .07em; font-weight: 600;
+}
+.field input, .field select, .field textarea {
+  padding: 8px var(--s3); border-radius: var(--r2);
+  border: 1px solid var(--line); background-color: var(--bg); color: var(--text);
+  transition: border-color var(--fast);
+}
+/* the chevron comes from the select rule; a shorthand here would wipe it */
+.field select { padding-right: 34px; }
+.edition select { padding-right: 34px; }
+.field input:hover, .field select:hover, .field textarea:hover { border-color: var(--text-3); }
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--brand-lift); outline: none; box-shadow: var(--glow);
+}
+label.check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px;
+              color: var(--text-2); cursor: pointer; }
+
+/* ─────────────────────────────────────────────── data */
+
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th {
+  text-align: left; padding: var(--s2) var(--s3); border-bottom: 1px solid var(--line);
+  font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-3); font-weight: 600; white-space: nowrap;
+}
+td { padding: 7px var(--s3); border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+tr.click { cursor: pointer; }
+/* A standalone action in a cell needs a real hit area. Inline text links inherit
+   the line box, which is about 16px tall and awkward to hit accurately. */
+td a, .muted > a { display: inline-flex; align-items: center; min-height: 28px;
+                   padding: 2px 6px; margin: -2px -6px; border-radius: var(--r1); }
+td a:hover, .muted > a:hover { background: var(--panel-2); text-decoration: none; }
+tr.click:hover td { background: var(--panel-2); }
+.wrap-x { overflow-x: auto; margin: 0 calc(var(--s5) * -1); padding: 0 var(--s5); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--line); border-radius: 99px;
+  padding: 1px 9px; font-size: 12px; color: var(--text-3); white-space: nowrap;
+}
+.chip.verified { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+.chip.stale    { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.chip.draft    { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.chip.review   { border-color: var(--brand-lift); color: var(--brand-lift); }
+.chip.err      { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+.chip.warn     { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+.chip.on       { border-color: var(--brand); color: #fff; background: var(--brand); }
+code, .mono { font: 500 12px var(--mono); }
+code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; color: var(--text-2); }
+
+/* ─────────────────────────────────────────────── section editor */
+
+.editor { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s4); align-items: start; }
+textarea.md {
+  width: 100%; min-height: 58vh; padding: var(--s3);
+  border: 1px solid var(--line); border-radius: var(--r2);
+  background: var(--bg); color: var(--text);
+  font: 400 12.5px/1.7 var(--mono); resize: vertical; tab-size: 2;
+}
+textarea.md:focus { border-color: var(--brand-lift); outline: none; box-shadow: var(--glow); }
+.prev {
+  border: 1px solid var(--line); border-radius: var(--r2);
+  padding: var(--s4); background: var(--panel); min-height: 58vh; overflow: auto;
+}
+.prev h4 { color: var(--brand-lift); margin: var(--s4) 0 var(--s2); font-size: 13px; }
+.prev p { margin: var(--s2) 0; }
+.prev img { max-width: 100%; border: 1px solid var(--line); border-radius: var(--r1); margin: var(--s2) 0; }
+.prev img.ic { height: 1.5em; vertical-align: -.4em; margin: 0 3px; display: inline-block;
+               border-radius: 4px; }
+.prev .note {
+  background: var(--brand-soft); border-left: 3px solid var(--brand-lift);
+  padding: var(--s2) var(--s3); border-radius: 0 var(--r1) var(--r1) 0;
+  margin: var(--s3) 0; font-size: 13px;
+}
+.prev .df { padding: 3px 0 3px var(--s4); text-indent: calc(var(--s4) * -1); }
+.prev .df b { color: var(--text); }
+.prev .df .ty { color: var(--brand-lift); font-size: 12px; }
+.prev figcaption { text-align: center; font-size: 12px; color: var(--text-3); font-style: italic; }
+
+/* ─────────────────────────────────────────────── drift, log, diff */
+
+.drift {
+  border: 1px solid var(--line); border-left: 3px solid var(--bad);
+  border-radius: 0 var(--r2) var(--r2) 0; padding: var(--s3) var(--s4);
+  margin: var(--s3) 0; background: var(--panel);
+}
+.drift .hd { display: flex; justify-content: space-between; gap: var(--s3);
+             align-items: center; margin-bottom: var(--s2); font-size: 13px; }
+.drift ul { margin: var(--s2) 0 0; padding-left: var(--s4); }
+.drift li { margin: 5px 0; display: flex; gap: var(--s3); align-items: center;
+            justify-content: space-between; }
+
+.log {
+  background: #060911; color: #C6D2F5; border: 1px solid var(--line);
+  border-radius: var(--r2); padding: var(--s3) var(--s4);
+  font: 400 12px/1.65 var(--mono); max-height: 340px; overflow: auto;
+  white-space: pre-wrap;
+}
+.log .e { color: #FF9AA8; }
+.log .k { color: #6EE7B7; }
+
+.diff {
+  font: 400 12.5px/1.6 var(--mono); border: 1px solid var(--line);
+  border-radius: var(--r2); overflow: auto; max-height: 60vh; background: var(--bg);
+}
+.diff div { padding: 1px var(--s3); white-space: pre-wrap; word-break: break-word; }
+.diff .add { background: var(--ok-soft); border-left: 3px solid var(--ok); }
+.diff .del { background: var(--bad-soft); border-left: 3px solid var(--bad); opacity: .9; }
+.diff .same { border-left: 3px solid transparent; color: var(--text-3); }
+.diff .skip { color: var(--text-3); font-style: italic; padding: 5px var(--s3);
+              border-left: 3px solid transparent; background: var(--panel-2); }
+pre.notes { white-space: pre-wrap; font: 400 13px/1.6 Inter, sans-serif; margin: 0; }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--s3); }
+.shot { border: 1px solid var(--line); border-radius: var(--r2); overflow: hidden;
+        background: var(--panel-2); }
+.shot img { width: 100%; display: block; background: #fff; }
+.shot .cap { padding: 6px var(--s2); font-size: 12px; color: var(--text-3);
+             display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+
+iframe.proof {
+  width: 100%; height: 76vh; border: 1px solid var(--line);
+  border-radius: var(--r3); background: #fff;
+}
+
+.toast {
+  position: fixed; right: var(--s5); bottom: var(--s5); z-index: 60;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-left: 3px solid var(--brand); padding: var(--s3) var(--s4);
+  border-radius: var(--r2); font-size: 13px; max-width: 420px;
+  box-shadow: var(--shadow); animation: rise 200ms var(--ease);
+}
+.toast.bad { border-left-color: var(--bad); }
+@keyframes rise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+
+.empty { color: var(--text-3); font-size: 13px; padding: var(--s4) 0; text-align: center; }
+
+/* ─────────────────────────────────────────────── responsive */
+
+@media (max-width: 1180px) { .editor { grid-template-columns: 1fr; } }
+
+@media (max-width: 1024px) {
+  :root { --rail-w: 220px; }
+  main { padding: var(--s4) var(--s4) var(--s7); }
+  .panel { padding: var(--s4); }
+  .wrap-x { margin: 0 calc(var(--s4) * -1); padding: 0 var(--s4); }
+}
+
+/* Below this the two-column shell stops being usable: the rail becomes a strip
+   above the content rather than squeezing both into nothing. The navigation
+   scrolls sideways rather than wrapping, so its items keep a predictable order
+   and never reflow into ragged rows as labels change. */
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); height: auto; }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand { padding-bottom: var(--s2); }
+  .edition { padding-bottom: var(--s2); }
+
+  .nav {
+    display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none;
+    padding: 0 var(--s3) var(--s3); scroll-snap-type: x proximity;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button { width: auto; flex: none; white-space: nowrap; scroll-snap-align: start; }
+  .nav button.on::before { display: none; }
+  .nav button.on { box-shadow: inset 0 -2px 0 var(--brand); }
+  .nav .spacer { display: none; }
+
+  .tree { max-height: 190px; }
+  main { height: auto; padding: var(--s4) var(--s3) var(--s6); }
+  .panel { padding: var(--s3); }
+  .wrap-x { margin: 0 calc(var(--s3) * -1); padding: 0 var(--s3); }
+}
+
+@media (max-width: 460px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats .cell:nth-child(2n) { border-right: 0; }
+  h2.page { font-size: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; transition-duration: .01ms !important;
+  }
+}
+
+/* Hints: the long explanation moves behind a marker, so the interface carries a
+   short line and the detail is one click away when it is actually wanted. */
+/* The marker reads as a 16px dot and answers to a 28px target. Growing the
+   dot itself would make a page of explanations shout; growing only the hit
+   area costs nothing and makes it reachable. */
+/* The dot reads as part of the sentence it belongs to, and the 28px target
+   sits invisibly around it. A fixed pixel vertical-align cannot do that: it is
+   right at one type size and wrong at every other, which is why the marker sat
+   below the line it was attached to. `middle` follows the type. */
+button.hint {
+  width: 28px; height: 28px; padding: 0; flex: none;
+  margin: -6px 0 -6px 1px; border: 0; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center;
+  vertical-align: middle;
+  color: var(--text-3);
+  transition: color var(--fast);
+}
+button.hint::before {
+  content: attr(data-mark); width: 15px; height: 15px;
+  border-radius: 50%; border: 1px solid currentColor;
+  font: 600 11px/1 var(--font-body); opacity: .85;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+button.hint:hover, button.hint[aria-expanded="true"] { color: var(--brand-lift); }
+button.hint:hover::before, button.hint[aria-expanded="true"]::before { opacity: 1; }
+.pop {
+  position: fixed; z-index: 80; max-width: 340px;
+  background: var(--panel); color: var(--text-2);
+  border: 1px solid var(--line); border-left: 3px solid var(--brand);
+  border-radius: var(--r2); padding: var(--s3) var(--s4);
+  font-size: 12.5px; line-height: 1.55; box-shadow: var(--shadow);
+  animation: rise 140ms var(--ease);
+}
+.pop b, .pop code { color: var(--text); }
+
+/* Modal: the browser's own confirm() is unstyled, blocks the page, and cannot
+   carry a reason field. Everything that needs a decision uses this instead. */
+.scrim {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(6, 9, 20, .62); backdrop-filter: blur(2px);
+  display: grid; place-items: center; padding: var(--s4);
+  animation: fade 140ms var(--ease);
+}
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+.modal {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r3); box-shadow: var(--shadow);
+  width: min(560px, 100%); max-height: 86vh; overflow: auto;
+  padding: var(--s5); animation: rise 180ms var(--ease);
+}
+.modal h3 { margin: 0 0 var(--s2); font-size: 15px; font-weight: 600;
+            display: flex; align-items: center; gap: var(--s2); }
+.modal .body { color: var(--text-2); font-size: 13.5px; line-height: 1.6; }
+.modal .foot { display: flex; gap: var(--s2); margin-top: var(--s4);
+               justify-content: flex-end; flex-wrap: wrap; }
+.modal .field { margin-top: var(--s4); }
+.modal textarea { min-height: 76px; resize: vertical; }
+
+/* a change that was already decided */
+.decided { opacity: .55; }
+.decided .line { text-decoration: line-through; }
+.note-card {
+  border-left: 3px solid var(--warn); background: var(--warn-soft);
+  border-radius: 0 var(--r1) var(--r1) 0; padding: var(--s2) var(--s3);
+  margin: var(--s2) 0; font-size: 12.5px;
+}
+.note-card b { color: var(--warn); }
+
+/* ── the job dock ──────────────────────────────────────────────────────────
+   Work used to take over the whole view, which meant losing your place to
+   watch a crawl. It runs here instead, beside whatever you were doing. */
+.dock {
+  position: fixed; right: var(--s5); bottom: var(--s5); z-index: 70;
+  width: min(420px, calc(100vw - 48px));
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r3); box-shadow: var(--shadow);
+  overflow: hidden; animation: rise 200ms var(--ease);
+}
+.dock .bar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s2) var(--s3); border-bottom: 1px solid var(--line-soft);
+  background: var(--panel-2); cursor: default;
+}
+.dock .bar .name { font-size: 12.5px; font-weight: 600; flex: 1;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock .bar button {
+  border: 0; background: transparent; color: var(--text-3);
+  padding: 2px 5px; border-radius: var(--r1); line-height: 1;
+  transition: color var(--fast), background var(--fast);
+}
+.dock .bar button:hover { color: var(--text); background: var(--panel); }
+.dock .frame { display: block; width: 100%; background: #fff;
+               border-bottom: 1px solid var(--line-soft); }
+.dock .where { padding: 5px var(--s3); font: 500 11px var(--mono);
+               color: var(--text-3); border-bottom: 1px solid var(--line-soft);
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock .lines {
+  font: 400 11.5px/1.6 var(--mono); color: var(--text-2);
+  padding: var(--s2) var(--s3); max-height: 150px; overflow: auto;
+  white-space: pre-wrap; background: var(--bg);
+}
+.dock .lines .e { color: var(--bad); }
+.dock .lines .k { color: var(--ok); }
+/* The dock clips its overflow, so a row that cannot wrap pushes its buttons
+   off the edge. Two long file names did exactly that on a publish. */
+.dock .foot { display: flex; flex-wrap: wrap; gap: var(--s2);
+              padding: var(--s2) var(--s3);
+              border-top: 1px solid var(--line-soft); }
+.dock .foot button {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-height: 30px;
+}
+.dock.min .frame, .dock.min .lines, .dock.min .foot, .dock.min .where { display: none; }
+
+.spin { width: 12px; height: 12px; flex: none; border-radius: 50%;
+        border: 2px solid var(--line); border-top-color: var(--brand-lift);
+        animation: spin .7s linear infinite; }
+@keyframes spin { to { rotate: 360deg } }
+.dot-state { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot-state.done { background: var(--ok); }
+.dot-state.failed { background: var(--bad); }
+
+/* ── sidebar sizing ────────────────────────────────────────────────────── */
+.rail-grip {
+  position: absolute; top: 0; right: -3px; bottom: 0; width: 6px;
+  cursor: col-resize; z-index: 5;
+}
+.rail-grip:hover, .rail-grip.dragging { background: var(--brand); opacity: .5; }
+aside { position: relative; }
+.brand .fold {
+  margin-left: auto; border: 0; background: transparent; color: var(--text-3);
+  width: 28px; height: 28px; flex: none; padding: 0; border-radius: var(--r1);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: color var(--fast), background var(--fast);
+}
+.brand .fold:hover { color: var(--brand-lift); background: var(--panel); }
+.brand .fold .ic { transition: rotate 200ms var(--ease); }
+
+.app.folded { grid-template-columns: 56px minmax(0, 1fr); }
+.app.folded .brand .who,
+.app.folded .edition,
+.app.folded .tree,
+.app.folded .nav button span,
+.app.folded .nav .count,
+.app.folded .rail-grip { display: none; }
+/* Folded, the rail is 56px and the mark is 32px centred in it. Pinning the
+   fold button to the top right corner puts it straight on top of the logo,
+   because there is no corner left to pin it to. Stack instead: mark, then the
+   control beneath it. */
+.app.folded .brand {
+  flex-direction: column; gap: var(--s2);
+  padding: var(--s3) 0 var(--s2); justify-content: center;
+}
+.app.folded .brand .fold { position: static; margin: 0; }
+.app.folded .brand .fold .ic { rotate: 180deg; }
+.app.folded .nav { padding: 0 var(--s2) var(--s3); }
+.app.folded .nav button { justify-content: center; padding: 9px 0; }
+.app.folded .nav button.on::before { left: -8px; }
+@media (max-width: 820px) { .app.folded { grid-template-columns: 1fr; } .rail-grip { display: none; } }
+
+/* Images: a strip on the section page, a room of their own for looking properly */
+.shotstrip { display: flex; gap: var(--s2); overflow-x: auto; padding-bottom: var(--s2); }
+.shotstrip .thumb {
+  flex: none; width: 132px; border: 1px solid var(--line); border-radius: var(--r2);
+  overflow: hidden; background: var(--panel-2); cursor: zoom-in;
+  transition: border-color var(--fast);
+}
+.shotstrip .thumb:hover { border-color: var(--brand-lift); }
+.shotstrip .thumb img { width: 100%; display: block; background: #fff; height: 76px;
+                        object-fit: cover; object-position: top left; }
+.shotstrip .thumb .cap { padding: 3px 6px; font-size: 12px; color: var(--text-3);
+                         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 95; background: rgba(6,9,20,.86);
+  display: grid; grid-template-rows: auto 1fr auto; animation: fade 140ms var(--ease);
+}
+.lightbox .lbbar, .lightbox .lbfoot {
+  display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s5);
+  color: var(--text); flex-wrap: wrap;
+}
+.lightbox .lbbar .name { font: 500 13px var(--mono); flex: 1;
+                         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lightbox .stage { overflow: auto; display: grid; place-items: center; padding: 0 var(--s5); }
+.lightbox .stage img { max-width: 100%; max-height: 100%; background: #fff;
+                       border-radius: var(--r2); box-shadow: var(--shadow); }
+.lightbox .stage.zoom { place-items: start; }
+.lightbox .stage.zoom img { max-width: none; max-height: none; cursor: grab; }
+.lightbox .meta { color: var(--text-3); font-size: 12px; }
+
+/* What is outstanding on a section, and the one action that clears each thing */
+.todo { display: grid; gap: var(--s2); }
+.todo .item { display: flex; align-items: center; gap: var(--s3);
+              padding: var(--s2) 0; border-bottom: 1px solid var(--line-soft); }
+.todo .item:last-child { border-bottom: 0; }
+.todo .item .mark { width: 18px; height: 18px; border-radius: 50%; flex: none;
+                    display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.todo .item.done .mark { background: var(--ok-soft); color: var(--ok); }
+.todo .item.open .mark { background: var(--warn-soft); color: var(--warn); }
+.todo .item .what { flex: 1; font-size: 13px; }
+.todo .item .what .why { color: var(--text-3); font-size: 12px; }
+
+
+/* ---- Design: typeface specimens ------------------------------------- */
+/* Cards are sized off the specimen, not a fixed column count: a face is
+   chosen by reading it, so the sample gets the room. */
+/* A caption for a set of controls rather than a label for one of them: the
+   group carries the accessible name, so this is only the visible text. */
+/* A native checkbox renders at about 13px. The label around it is the real
+   target, so the row is given the height and the box is grown to meet it. */
+/* the drawn marks the document prints, reused here so the two agree */
+.gly { display: inline-block; vertical-align: -0.14em; margin-right: .4em;
+  color: var(--text-3); flex: none; }
+tr:hover .gly, .on .gly { color: var(--brand-lift); }
+
+input[type="checkbox"] {
+  width: 16px; height: 16px; margin: 0 2px 0 0;
+  accent-color: var(--brand); flex: none;
+}
+label:has(> input[type="checkbox"]) {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 28px; cursor: pointer;
+}
+
+.field .lab {
+  display: block; font-size: 12px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px;
+}
+
+/* Secondary navigation. Quieter than the working group above it, and clearly
+   a different thing rather than more of the same list. */
+.navlabel {
+  padding: var(--s4) var(--s3) 4px;
+  font-size: 12px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+.navgroup { margin-top: var(--s3); }
+.navgroup > summary {
+  padding: 4px var(--s3); min-height: 28px; cursor: pointer;
+  font-size: 12px; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .09em;
+  display: flex; align-items: center; gap: 6px; list-style: none;
+}
+.navgroup > summary::-webkit-details-marker { display: none; }
+.navgroup > summary::before { content: '\25b8'; transition: rotate var(--fast); }
+.navgroup[open] > summary::before { rotate: 90deg; }
+.navgroup > summary:hover { color: var(--brand-lift); }
+.nav button.quiet { color: var(--text-3); }
+.app.folded .navlabel,
+.app.folded .navgroup > summary { display: none; }
+.app.folded .navgroup { margin-top: var(--s2); }
+.app.folded .navgroup[open] > button,
+.app.folded .navgroup > button { display: flex; }
+
+/* Settled work, kept reachable but out of the way of what is still open. */
+/* A card whose every difference is decided is not outstanding, so it does not
+   wear the colour of something that is. */
+.drift.settled-card {
+  border-left-color: var(--line);
+  background: transparent;
+}
+.drift.settled-card .hd b { color: var(--text-2); font-weight: 500; }
+
+.settled { margin-top: var(--s2); }
+.settled > summary {
+  cursor: pointer; color: var(--text-3); font-size: 12.5px;
+  padding: var(--s1) 0; list-style: none;
+  display: flex; align-items: center; gap: 6px; min-height: 28px;
+}
+.settled > summary::before { content: '\25b8'; transition: rotate var(--fast); }
+.settled[open] > summary::before { rotate: 90deg; }
+.settled > summary:hover { color: var(--brand-lift); }
+.settled > summary::-webkit-details-marker { display: none; }
+
+.faces {
+  display: grid; gap: var(--s3); margin: var(--s3) 0;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+.face {
+  border: 1px solid var(--line); border-radius: var(--r2);
+  background: var(--panel); padding: var(--s3);
+  display: flex; flex-direction: column; gap: var(--s2);
+  transition: border-color .18s ease, background .18s ease;
+}
+.face:hover { border-color: var(--brand-lift); }
+.face.on { border-color: var(--brand-lift); background: var(--panel-2);
+  box-shadow: var(--glow); }
+.face.gone { opacity: .55; }
+.face .name { font-weight: 600; font-size: 13.5px; }
+.face .spec {
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  padding: var(--s3) 0; color: var(--text-1);
+}
+.face .spec .big { font-size: 21px; font-weight: 600; letter-spacing: -.015em; }
+.face .spec .run { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.face .spec .fig {
+  font-size: 12.5px; color: var(--text-3); margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.face .where { font-size: 12px; color: var(--text-3); }
+.face .why { font-size: 12px; color: var(--text-3); line-height: 1.45; }
+.face .row { margin-top: auto; }
+.face .mini.on { background: var(--brand-soft); color: var(--brand-lift);
+  border-color: transparent; cursor: default; }
+
+/* editions: one row per section, indented to the outline it belongs to */
+.erow{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;
+  border-bottom:1px solid var(--line)}
+.erow:last-child{border-bottom:0}
+.erow.off .etitle,.erow.off .eid{opacity:.5}
+.erow.off .etitle{text-decoration:line-through;text-decoration-thickness:1px}
+.egrip{display:flex;align-items:center;min-width:18px;min-height:28px}
+.egrip svg{width:13px;height:13px;opacity:.45}
+.ebody{min-width:0}
+.etitle{font-size:13px}
+/* 12px is the floor for anything carrying words, and a section id is words.
+   The id needs to sit back from the title, so it gives up colour and weight
+   rather than points. */
+.etitle .num{font-family:var(--mono);font-size:12px;color:var(--text-3);
+  margin-right:2px}
+.eid{font-family:var(--mono);font-size:12px;color:var(--text-3);margin-top:2px;
+  letter-spacing:-.01em;word-break:break-word}
+
+/* the first five minutes: three steps, in the order they have to happen */
+.panel.start h3{margin-bottom:4px}
+.steps{margin-top:16px;display:flex;flex-direction:column;gap:2px}
+.step{display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:0;padding-top:6px}
+.dot{flex:none;width:26px;height:26px;border-radius:50%;display:grid;
+  place-items:center;font-size:12px;font-weight:600;font-family:var(--mono);
+  background:var(--brand-soft);color:var(--brand-lift);border:1px solid var(--line)}
+.step.done .dot{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.step.done .dot svg{width:14px;height:14px}
+.step.done .steptitle{color:var(--text-2)}
+.stepbody{min-width:0;flex:1}
+.steptitle{font-size:13.5px;font-weight:600;margin-bottom:3px}

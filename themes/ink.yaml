@@ -1,0 +1,14 @@
+label: Ink
+about: >
+  Editorial monochrome with one warm accent. Almost no colour, so the accent
+  means something when it appears. For documents that will be printed and read
+  end to end rather than searched.
+font: Source Sans 3
+navy_hero: "1C1917"
+navy_deep: "121110"
+brand_blue: "9A3412"
+lavender: "F5F0EA"
+periwinkle: "C2410C"
+note_accent:
+  Important: "9A3412"
+  Warning: "9A3412"
