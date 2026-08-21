@@ -242,9 +242,15 @@ class PdfRenderer:
         # not as a fact that does not apply, so an empty row is not printed.
         facts = "".join(f"<div><b>{_esc(k)}</b><span>{_esc(v)}</span></div>"
                         for k, v in rows if str(v).strip())
+        # A company that has not named itself separately from its product is not
+        # two lines of cover: printing the same word large and then again small
+        # reads as a template that failed to fill rather than as a masthead.
+        name, vendor = prod.get("name", ""), prod.get("vendor") or ""
+        masthead = vendor or name
+        second = name if vendor and vendor.strip() != name.strip() else ""
         return (f'<div class="cover"><div class="bar top"></div>'
-                f'<div class="vendor">{_esc(prod.get("vendor") or prod.get("name", "")).upper()}</div><hr>'
-                f'<div class="product">{_esc(prod.get("name",""))}</div>'
+                f'<div class="vendor">{_esc(masthead).upper()}</div><hr>'
+                f'<div class="product">{_esc(second)}</div>'
                 f'<div class="subtitle">{_esc(self.p.title())}</div>'
                 f'<div class="facts">{facts}</div>'
                 f'<div class="conf">{_esc(doc.get("confidentiality",""))}</div>'
