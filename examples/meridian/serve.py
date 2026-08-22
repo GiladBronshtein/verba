@@ -117,8 +117,8 @@ def page_accounts() -> str:
   <div class="spacer" style="flex:1"></div>
   <button class="btn">Export</button>
   <button class="btn primary">New account</button></div>
-<table><thead><tr><th>Name</th><th>Account ID</th><th>Data Region</th><th>Plan</th>
-  <th>Owner</th><th>Status</th></tr></thead><tbody>{rows}</tbody></table></div>""")
+<table><thead><tr><th>Name</th><th>Account ID</th><th>Data Region</th><th>Tier</th>
+  <th>Owner</th><th>Health</th></tr></thead><tbody>{rows}</tbody></table></div>""")
 
 
 def page_account(idx: int) -> str:
@@ -132,7 +132,7 @@ def page_account(idx: int) -> str:
   <div><button class="btn">Duplicate</button>
     <button class="btn primary">Edit account</button></div></div>
 <div class="card"><div class="tabs"><a class="on">Configuration</a><a>Usage</a>
-  <a>Billing</a></div>
+  <a>Billing</a><a>Integrations</a></div>
 <div class="fields">
   <div class="lbl">Display name<small>Shown across the console</small></div><div>{name}</div>
   <div class="lbl">Account ID<small>Immutable</small></div><div class="mono">{aid}</div>

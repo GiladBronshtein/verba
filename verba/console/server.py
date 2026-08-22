@@ -903,6 +903,9 @@ class Handler(BaseHTTPRequestHandler):
                     # never the key itself, only whether there is one
                     "has_key": bool(assist.stored_api_key()),
                     "models": assist.KNOWN_MODELS,
+                    # what the configured gateway actually carries, asked at
+                    # the moment the page is opened rather than guessed
+                    "gateway_models": assist.gateway_models(),
                     "backends": assist.backends(),
                     "house_rules": (assist.house_rules_path(st.root).read_text(encoding="utf-8")
                                     if assist.house_rules_are_custom(st.root)

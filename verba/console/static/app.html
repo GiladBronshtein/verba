@@ -23,33 +23,52 @@
 <body>
 <div id="sprite"></div>
 <div class="app">
-  <aside>
-    <div class="brand">
-      <div class="mark" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/>
-          <path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>
+  <!-- The header carries who you are and where you are in the process. Both used
+       to live in the left rail, which meant the rail was doing three jobs at
+       once: identity, the sequence, and whatever the current view needed. With
+       a section open the outline was pushed below the appearance toggle, small
+       and unreachable, which is what a rail with three jobs does to the third. -->
+  <header class="top">
+    <a class="brand" href="#" id="home" title="Overview">
+      <span class="mark" aria-hidden="true">
+        <!-- the same mark as the tab icon: a V that is also a tick, over the
+             line of type it is checking -->
+        <svg width="22" height="22" viewBox="0 0 64 64">
+          <path d="M17 19 L28.5 40 L48 13.5" fill="none" stroke="currentColor"
+                stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20.5 51 H39.5" fill="none" stroke="currentColor"
+                stroke-width="6.5" stroke-linecap="round" opacity="0.88"/>
         </svg>
-      </div>
-      <div class="who">
-        <h1 id="appName">Verba</h1>
-        <div class="sub" id="docTitle">loading</div>
-      </div>
-      <button class="fold" id="fold" title="Collapse the sidebar"
-              aria-label="Collapse the sidebar"></button>
-    </div>
+      </span>
+      <span class="wordmark">Verba</span>
+    </a>
 
-    <div class="edition">
-      <label class="field" style="gap:4px">
+    <button class="doc" id="docTitle" title="Switch document, or start a new one">
+      loading
+    </button>
+
+    <nav class="flow" id="steps" aria-label="The document, step by step"></nav>
+
+    <div class="tools">
+      <label class="field">
         <span class="visually-hidden" style="position:absolute;left:-9999px">Edition</span>
         <select id="profile" title="Edition"></select>
       </label>
+      <div id="scheme"></div>
+      <button class="icon-btn" id="reload" title="Read the content tree again from disk"
+              aria-label="Reload from disk"></button>
     </div>
+  </header>
 
-    <nav class="nav" id="nav" aria-label="Sections of the console"></nav>
-
+  <aside>
+    <!-- Contextual. The outline while you are writing, the places you look at
+         and the things you set up otherwise. One job at a time. -->
+    <nav class="nav" id="nav" aria-label="Elsewhere in the console"></nav>
     <div class="tree" id="tree" aria-label="Document outline"></div>
+    <div class="rail-foot">
+      <button class="foldbtn" id="fold" title="Hide the sidebar"
+              aria-label="Hide the sidebar"></button>
+    </div>
     <div class="rail-grip" id="railGrip" title="Drag to resize"
          role="separator" aria-orientation="vertical" tabindex="0"></div>
   </aside>

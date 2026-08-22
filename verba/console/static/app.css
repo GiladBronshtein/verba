@@ -144,8 +144,13 @@ a:hover { text-decoration: underline; }
 .app {
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "top top" "rail main";
   height: 100vh;
 }
+header.top { grid-area: top; }
+aside { grid-area: rail; }
+main { grid-area: main; }
 
 aside {
   background: var(--rail);
@@ -929,7 +934,7 @@ label:has(> input[type="checkbox"]) {
 .stepn.ready{background:var(--brand-soft);color:var(--brand-lift);border-color:transparent}
 .stepbody{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}
 .stept{font-size:13.5px;font-weight:550;line-height:1.25}
-.steps{font-size:12px;color:var(--text-3);line-height:1.3;
+.nav .step .steps-sub{font-size:12px;color:var(--text-3);line-height:1.3;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .step.on .stept{color:var(--text)}
 /* An eyebrow gets its presence from letter-spacing, not from being set small
@@ -1053,3 +1058,141 @@ h3.sub{font-size:14px;font-weight:600;margin:24px 0 8px}
   opacity:.65;min-width:9px;margin-top:2px}
 .step.on .stepord{opacity:.9}
 .app.folded .stepord{display:none}
+
+/* ── the header ────────────────────────────────────────────────────────────
+   Identity on the left, the process across the middle, the controls you touch
+   once a day on the right. It exists so the rail can do one job instead of
+   three: with a section open the outline now has the whole rail rather than
+   whatever was left under the appearance toggle. */
+header.top {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: 0 var(--s4);
+  height: 54px; flex: none;
+  background: var(--rail);
+  border-bottom: 1px solid var(--line);
+}
+header.top .brand {
+  display: flex; align-items: center; gap: 9px;
+  color: inherit; text-decoration: none; flex: none;
+}
+header.top .mark {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  display: grid; place-items: center;
+  background: var(--brand); color: #fff;
+}
+header.top .wordmark {
+  font-size: 15.5px; font-weight: 700; letter-spacing: -.015em;
+}
+header.top .doc {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--r1);
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer;
+  max-width: 230px; white-space: nowrap; overflow: hidden;
+  transition: border-color var(--fast), color var(--fast);
+}
+header.top .doc:hover { border-color: var(--brand-lift); color: var(--text); }
+header.top .doc::after {
+  content: ""; width: 12px; height: 12px; flex: none; opacity: .6;
+  background: var(--chevron) center/12px no-repeat;
+}
+header.top .tools { flex: none; display: flex; align-items: center; gap: 8px; }
+header.top .tools select { min-width: 96px; }
+header.top .scheme { margin: 0; padding: 3px; }
+header.top .scheme button { padding: 5px 7px; }
+.icon-btn {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--r1);
+  background: var(--surface); color: var(--text-3); cursor: pointer;
+}
+.icon-btn:hover { color: var(--text); border-color: var(--brand-lift); }
+.icon-btn svg { width: 15px; height: 15px; }
+
+/* the process, read left to right the way a sequence is read.
+
+   Named `flow`, not `steps`: that class was already the first-run checklist and
+   already the state line under a rail step, and a third meaning turned the
+   header into a column six rows tall that fell through the page. */
+.flow {
+  display: flex; align-items: stretch; gap: 2px;
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.flow::-webkit-scrollbar { display: none; }
+/* A step carries its own surface and border at rest. With a transparent border
+   and no background these read as plain text until you happened to hover one,
+   and an interface that only admits to being clickable once you are already
+   pointing at it has told you nothing. */
+.flow .step {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 9px; border-radius: var(--r1);
+  border: 1px solid var(--line); background: var(--surface); color: inherit;
+  font: inherit; cursor: pointer; white-space: nowrap;
+  transition: background var(--fast), border-color var(--fast),
+              transform var(--fast);
+}
+.flow .step:hover {
+  background: var(--panel-2); border-color: var(--brand-lift);
+}
+.flow .step:active { transform: translateY(1px); }
+.flow .step:focus-visible { outline: 2px solid var(--brand-lift); outline-offset: 1px; }
+.flow .step.on {
+  background: var(--brand-soft); border-color: var(--brand-lift);
+  box-shadow: inset 0 0 0 1px var(--brand-lift);
+}
+.flow .stepbody { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.flow .stept { font-size: 13px; font-weight: 550; line-height: 1.2; }
+.flow .steps-sub {
+  font-size: 12px; color: var(--text-3); line-height: 1.25;
+  max-width: 132px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.flow .step.on .stept { color: var(--text); }
+.flow .stepord { display: none; }
+.flow .younow {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--brand-lift);
+}
+
+/* the rail is contextual now, so it starts at the top rather than under a brand */
+aside .nav { padding-top: var(--s3); }
+.tree { border-top: 1px solid var(--line-soft); }
+
+/* narrow: the steps keep their marks and lose their captions before they wrap */
+@media (max-width: 1320px) { .flow .steps-sub { display: none; } }
+@media (max-width: 1180px) { header.top .wordmark { display: none; } }
+@media (max-width: 1100px) {
+  header.top .doc { max-width: 130px; }
+  .flow .stept { display: none; }
+  .flow .step { padding: 6px 9px; }
+}
+
+/* folded: the rail goes away entirely rather than shrinking to a strip of
+   icons. It carries the outline or a short list, and neither is legible at
+   56px, so half a rail is just a thing in the way. */
+/* Folded keeps a narrow strip rather than removing the rail, because the
+   control that folded it lives at the foot of the rail and a control you
+   cannot reach is a trap. */
+.app.folded { grid-template-columns: 46px minmax(0, 1fr); }
+.app.folded aside > .nav,
+.app.folded aside > .tree,
+.app.folded .rail-grip { display: none; }
+
+.rail-foot {
+  margin-top: auto; flex: none;
+  padding: var(--s2) var(--s3) var(--s3);
+  border-top: 1px solid var(--line-soft);
+  display: flex; justify-content: flex-end;
+}
+.app.folded .rail-foot { justify-content: center; padding: var(--s2) 0 var(--s3); }
+.foldbtn {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--r1);
+  background: var(--surface); color: var(--text-3); cursor: pointer;
+  transition: color var(--fast), border-color var(--fast);
+}
+.foldbtn:hover { color: var(--text); border-color: var(--brand-lift); }
+.foldbtn svg { width: 15px; height: 15px; transition: transform var(--fast); }
+.app.folded .foldbtn svg { transform: rotate(180deg); }
+.icon-btn.on { background: var(--brand-soft); color: var(--brand-lift);
+  border-color: var(--brand-lift); }

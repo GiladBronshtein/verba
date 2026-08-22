@@ -130,6 +130,37 @@ KNOWN_MODELS = [
 ]
 
 
+def gateway_models(timeout: int = 12) -> list[str]:
+    """What the configured gateway actually offers.
+
+    A hardcoded list of three Claude models is a guess about somebody else's
+    proxy. A gateway knows what it is carrying and will say so, and the models
+    it carries are not all Claude: this one answers with GPT variants too, and
+    they work, because the proxy translates the Anthropic Messages API on the
+    model's behalf.
+    """
+    if not LITELLM_BASE:
+        return []
+    key = gateway_key()
+    if not key:
+        return []
+    import json
+    import urllib.request
+    for path in ("/v1/models", "/models"):
+        try:
+            req = urllib.request.Request(
+                LITELLM_BASE + path, headers={"Authorization": f"Bearer {key}"})
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                data = json.loads(r.read())
+            found = sorted({str(m.get("id")) for m in data.get("data", [])
+                            if m.get("id")})
+            if found:
+                return found
+        except Exception:
+            continue
+    return []
+
+
 def stored_api_key() -> str | None:
     import subprocess
     r = subprocess.run(["security", "find-generic-password",

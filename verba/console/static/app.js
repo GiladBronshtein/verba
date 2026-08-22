@@ -213,10 +213,9 @@ async function refresh() {
   // A line of text that silently does something when clicked is not a control.
   // It reads as a caption, so nobody clicks it, and the feature may as well not
   // exist. This one says what it is and looks like it can be pressed.
-  dt.innerHTML = `<span class="dnow">${esc(S.product.name)}</span>` +
-                 `<svg class="dchev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
-                    aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+  // the chevron is drawn by CSS on .doc::after; adding one here too gave the
+  // button two of them
+  dt.textContent = S.product.name;
   dt.setAttribute('role', 'button');
   dt.setAttribute('tabindex', '0');
   dt.title = 'Switch document, or start a new one';
@@ -224,7 +223,7 @@ async function refresh() {
   dt.onkeydown = (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); documentPicker(); }
   };
-  drawNav(); drawTree();
+  drawSteps(); drawNav(); drawTree();
   render();
 }
 
@@ -399,7 +398,12 @@ function setScheme(v) {
     localStorage.setItem('verba.scheme', v);
     document.documentElement.setAttribute('data-theme', v);
   }
-  drawNav();
+  drawNav(); drawSteps(); drawScheme();
+}
+
+function drawScheme() {
+  const host = $('#scheme');
+  if (host) { host.innerHTML = ''; host.append(schemeControl()); }
 }
 
 function schemeControl() {
@@ -419,33 +423,43 @@ function schemeControl() {
   return wrap;
 }
 
-function drawNav() {
-  const n = $('#nav'); n.innerHTML = '';
+/* The process, across the header. Read left to right, which is how a sequence
+   is read, and always visible whatever view you are in. */
+function drawSteps() {
+  const n = $('#steps'); if (!n) return;
+  n.innerHTML = '';
   const here = currentStage().id;
 
-  // A step: its number, its name, and one line saying where it stands. The
-  // line matters more than the mark beside it, because the mark is a colour
-  // and a person who cannot separate two colours still has to be able to work.
-  const step = (st) => {
+  STAGES.forEach(st => {
     const s = st.state(S);
     const b = el('button', 'step' + (view === st.id ? ' on' : '') +
                            (st.id === here ? ' here' : ''));
     b.dataset.v = st.id;
     b.setAttribute('aria-current', view === st.id ? 'page' : 'false');
+    // Only the step with the work in it carries its line. Six captions across a
+    // header is a paragraph nobody reads, and it pushed Publish off the end at
+    // any window narrower than a very wide one. The mark still says how each
+    // step stands, and hovering gives the words.
+    const detail = (st.id === here || view === st.id)
+      ? `<span class="steps-sub">${esc(s.line)}</span>` : '';
     b.innerHTML =
-      // The mark says how the step stands. It must not say a number, because a
-      // number in a coloured circle beside a label is a count everywhere else
-      // in software: "Check 5" was read as five findings when it meant step
-      // five, and the page beside it said four. The ordinal is still there,
-      // small and plain, where it reads as an ordinal.
       `<span class="stepn ${s.tone}">${STEP_MARK[s.tone] || ''}</span>` +
-      `<span class="stepord">${st.n}</span>` +
       `<span class="stepbody"><span class="stept">${esc(st.label)}</span>` +
-      `<span class="steps">${esc(s.line)}</span></span>`;
+      detail + `</span>`;
+    b.title = `${st.label}: ${s.line}`;
     if (st.id === here) b.append(el('span', 'younow', 'now'));
     b.onclick = () => setView(st.id);
-    return b;
-  };
+    n.append(b);
+  });
+}
+
+/* The rail, which now has one job at a time: the outline while you are writing,
+   and otherwise the places you go and look at things. */
+function drawNav() {
+  const n = $('#nav'); n.innerHTML = '';
+  const writing = view === 'section';
+  n.hidden = writing;
+  if (writing) return;
 
   const plain = ([id, label, ic]) => {
     const b = el('button', view === id ? 'on' : '', icon(ic) + `<span>${esc(label)}</span>`);
@@ -454,9 +468,6 @@ function drawNav() {
     b.onclick = () => setView(id);
     return b;
   };
-
-  n.append(el('div', 'navlabel', 'The document'));
-  STAGES.forEach(st => n.append(step(st)));
 
   n.append(el('div', 'navlabel', 'Look at'));
   LOOK.forEach(i => n.append(plain(i)));
@@ -467,12 +478,6 @@ function drawNav() {
   d.append(el('summary', null, 'Set up'));
   SETUP.forEach(i => d.append(plain(i)));
   n.append(d);
-
-  // Reload is something you do, not somewhere you go.
-  const r = el('button', 'quiet', icon('refresh') + '<span>Reload</span>');
-  r.title = 'Read the content tree again from disk';
-  r.onclick = () => refresh().then(() => toast('Reloaded from disk'));
-  n.append(el('div', 'spacer'), r, schemeControl());
 }
 
 function drawTree() {
@@ -488,6 +493,8 @@ function drawTree() {
   const writing = view === 'section';
   t.hidden = !writing;
   if (!writing) return;
+  // The whole rail, not the strip left under the appearance toggle. The header
+  // took identity and the process, which is what was crowding it out.
   t.append(el('div', 'head', 'Outline'));
   S.sections.forEach(s => {
     const r = el('div', `row l${s.level}${s.id === currentId && view === 'section' ? ' on' : ''}`);
@@ -1749,6 +1756,42 @@ async function drawAssistant(m) {
   // Which model, chosen by what it is good at rather than by its id.
   const mp = el('div', 'panel');
   mp.append(el('h3', null, 'Which model does the writing'));
+
+  // What the gateway actually carries, asked rather than guessed. A fixed list
+  // of three Claude models is a guess about somebody else's proxy, and this one
+  // turns out to carry GPT variants too, which work because the proxy speaks
+  // the Anthropic API on their behalf.
+  const offered = d.gateway_models || [];
+  if (offered.length) {
+    mp.append(el('div', 'muted',
+      `Your AI service offers ${offered.length} models. Pick any of them.`));
+    const pick = el('div', 'field'); pick.style.maxWidth = '420px';
+    pick.style.marginTop = '10px';
+    const sel = el('select');
+    offered.forEach(id => {
+      const o = document.createElement('option');
+      o.value = id; o.textContent = id;
+      if (id === d.model) o.selected = true;
+      sel.append(o);
+    });
+    if (!offered.includes(d.model) && d.model) {
+      const o = document.createElement('option');
+      o.value = d.model; o.textContent = d.model + '  (not on the list)';
+      o.selected = true; sel.prepend(o);
+    }
+    sel.onchange = async () => {
+      await api('/api/assistant/set', { method: 'POST', json: { model: sel.value } });
+      toast(`Now writing with ${sel.value}`);
+      drawAssistant(holder());
+    };
+    pick.append(sel);
+    mp.append(pick);
+    mp.append(el('div', 'help',
+      'Anything that is not Claude reaches the model through your service, ' +
+      'which translates for it. If one does not answer, try another.'));
+    m.append(mp);
+  } else {
+
   const grid = el('div', 'models');
   const known = d.models.some(x => x.id === d.model);
   d.models.forEach(mo => {
@@ -1770,6 +1813,7 @@ async function drawAssistant(m) {
       `That is fine: it is passed through exactly as written.`));
   }
   m.append(mp);
+  }
 
   // Everything an ordinary person never has to see.
   const adv = el('details', 'advanced');
@@ -4073,7 +4117,7 @@ function setupRail() {
   const app = document.querySelector('.app');
   const fold = $('#fold');
   const grip = $('#railGrip');
-  fold.innerHTML = icon('chevron');
+  if (fold) fold.innerHTML = icon('chevron');
 
   const applyWidth = (px) => {
     document.documentElement.style.setProperty('--rail-w', px + 'px');
@@ -4085,12 +4129,13 @@ function setupRail() {
 
   const syncFold = () => {
     const folded = app.classList.contains('folded');
-    fold.title = folded ? 'Expand the sidebar' : 'Collapse the sidebar';
-    fold.setAttribute('aria-label', fold.title);
     localStorage.setItem('verba.folded', folded ? '1' : '0');
+    if (!fold) return;
+    fold.title = folded ? 'Show the sidebar' : 'Hide the sidebar';
+    fold.setAttribute('aria-label', fold.title);
   };
   syncFold();
-  fold.onclick = () => { app.classList.toggle('folded'); syncFold(); };
+  if (fold) fold.onclick = () => { app.classList.toggle('folded'); syncFold(); };
 
   // drag to resize, with the pointer captured so it keeps tracking outside the grip
   let dragging = false;
@@ -4126,6 +4171,15 @@ function setupRail() {
 function boot() {
   $('#sprite').innerHTML = iconSprite();
   setupRail();
+  drawScheme();
+  // the header's own controls, wired once
+  const home = $('#home');
+  if (home) home.onclick = (e) => { e.preventDefault(); setView(currentStage().id); };
+  const rl = $('#reload');
+  if (rl) {
+    rl.innerHTML = icon('refresh');
+    rl.onclick = () => refresh().then(() => toast('Reloaded from disk'));
+  }
   $('#profile').onchange = async e => {
     await api('/api/profile', { method: 'POST', json: { profile: e.target.value } });
     currentId = null; await refresh(); setView(currentStage().id);

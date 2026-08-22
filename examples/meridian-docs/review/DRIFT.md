@@ -1,12 +1,12 @@
 # Documentation drift review
 
-Capture: 2026-08-21T21:15:04    Profile: default
+Capture: 2026-08-22T17:52:41    Profile: default
 
 ## Summary
 
 - sections affected: 5
+- added: 4
 - removed: 2
-- added: 2
 - unmapped: 10
 - unmapped screens: 0
 - suspect screens: 0
@@ -29,15 +29,17 @@ Capture: 2026-08-21T21:15:04    Profile: default
 ### 4.1 Accounts List
 `accounts.list`
 
-- [!] added column `OWNER`
+- [!] added column `HEALTH`
+- [!] removed column `Plan`
+- [!] removed column `Status`
+- [!] added column `TIER`
 - [?] live screen exposes 4 filters but the section documents none
 
 ### 4.2 Account Detail
 `accounts.detail`
 
-- [!] removed tab `Audit log`
 - [!] added tab `Configuration`
-- [!] removed tab `Settings`
+- [!] added tab `Integrations`
 - [?] live screen exposes 2 actions but the section documents none
 - [?] live screen exposes 8 fields but the section documents none
 
