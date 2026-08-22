@@ -14,14 +14,26 @@ verba env verify        # start here, always
 |---|---|
 | Wrong password | `verba env password <id>` to store it again |
 | Wrong `signed_in_when` | It must be a selector that only exists once signed in |
-| A second factor | Use `auth: sso` instead of `form`. `verba env signin <id>` |
+| A second factor | Set `auth: handoff`, or run `verba capture --wait-for-signin` once |
 | The login selectors moved | `verba capture --headed` and watch it |
 
 `verify` is the command that separates the network, the credentials and the
 selectors. Guessing between those three is what makes this slow.
 
 **Single sign on worked yesterday and not today.** Sessions expire. `verba env
-signin <id>` again. There is nothing stored to clear.
+signin <id>` again. There is nothing stored to clear. A `handoff` connection
+does not need you to: the next crawl opens a browser and waits.
+
+**The product started asking for a code and every crawl now fails.**
+
+```bash
+verba capture --wait-for-signin
+```
+
+Then change the connection to `auth: handoff` so it keeps working.
+
+**A hand over opened no window.** It opens one only when it needs a person. With
+a valid saved session there is nothing to ask, which is the intended state.
 
 ## Capture
 

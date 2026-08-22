@@ -96,11 +96,30 @@ Yes. `content/house.md` replaces the built in set entirely. The built in rules
 are one house's, and a tool that documents anybody's product cannot also insist
 on one company's punctuation.
 
-### Does it work on a product behind SSO with a second factor?
+### Does it work on a product that asks for a code, or a prompt on my phone?
 
-Yes. `auth: sso`, then `verba env signin <id>`: a real browser opens, you
-complete whatever your identity provider asks, and the session is kept. No
-password is stored anywhere.
+Yes, and you do not have to do anything in advance. Set the connection to
+`auth: handoff`. When a crawl needs to sign in, a browser opens, Verba fills in
+what it knows, and then waits for you to finish: one-time code, push
+notification, hardware key, whatever it is. The moment the product is on screen
+the crawl carries on by itself, in the same run, and the session is saved so you
+are not asked again until it lapses.
+
+For one run on a connection you have not changed:
+
+```bash
+verba capture --wait-for-signin
+```
+
+`auth: sso` is the other way round: you sign in once beforehand with `verba env
+signin <id>` and crawls use the saved session. Both store no password. See
+[Connections and sign in](Connections-and-sign-in).
+
+### Is it safe to let me drive the browser mid-crawl?
+
+That window is the one time a person is inside the phase where writes are
+permitted. Verba stops permitting them the instant the product appears, before
+the crawl resumes, and every request allowed before that is in the run manifest.
 
 ### Does it need a GitHub repository, a database, or a server?
 

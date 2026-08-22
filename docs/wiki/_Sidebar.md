@@ -1,5 +1,7 @@
 **[Home](Home)**
 
+**[Features](Features)**
+
 **Getting started**
 - [Installation](Installation)
 - [Your first document](Your-first-document)

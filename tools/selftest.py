@@ -449,6 +449,18 @@ def t_readonly():
     eq(len(s.allowed_posts), 1, "the sign-in write was not recorded: ")
     eq(s.report()["blocked_writes"], 0, "sign-in counted as a blocked write: ")
 
+    # a hand-over puts a person at the keyboard inside the sign-in phase, where
+    # writes are permitted. The moment the product is on screen that stops being
+    # true, before `lock()` runs, so their next click cannot reach the product.
+    h = Guard()
+    r = Route(); h._handle(r, Req("POST", "https://idp.example.test/verify"))
+    eq(r.acted, "continue", "the second factor was blocked: ")
+    h.reached_product()
+    r = Route(); h._handle(r, Req("PUT"))
+    eq(r.acted, "abort", "a click after the sign-in landed reached the product: ")
+    r = Route(); h._handle(r, Req("GET"))
+    eq(r.acted, "continue", "reading was blocked after the hand-over: ")
+
     # a step that could write is refused before a browser is ever opened
     for step in ({"fill": "input", "value": "x"}, {"press": "Enter"},
                  {"sorcery": "yes"}):
@@ -464,7 +476,8 @@ def t_readonly():
     # because the network guard is what actually stops it
     ok(check_step({"click": "button.save"}, "readonly"),
        "a click reading like a commit drew no warning")
-    return "reads pass, writes abort, sign-in is the one logged exception"
+    return ("reads pass, writes abort, sign-in is the one logged exception, "
+            "and it closes the moment the product appears")
 
 
 @check("a rewrite can never drop a figure")
@@ -740,6 +753,149 @@ def t_readonly_live():
     return f"clicked Save; server received nothing; {guard.blocked[0][:44]}..."
 
 
+@check("a sign-in a machine cannot finish is handed to a person")
+def t_handoff_waits_for_the_person():
+    """Two-factor sign-in, proved against a server that insists on the code.
+
+    The interesting case is not "does it wait": anything can wait. It is that
+    the crawl fills in what it knows, stops at the wall, carries on by itself
+    once the wall is gone, saves the session so nobody is asked twice, and is
+    read-only again the moment the product appears.
+
+    The person is played by the `on_wait` hook, which is the same seam the
+    console uses to stream progress. Same thread, no timing games.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    writes: list[str] = []
+    CODE = "314159"
+
+    LOGIN = b"""<!doctype html><html><body><h1>Sign in</h1>
+      <form method="POST" action="/login">
+        <input type="email" name="u" autocomplete="username">
+        <input type="password" name="p" autocomplete="current-password">
+        <button type="submit">Continue</button>
+      </form></body></html>"""
+
+    # Same path, new page. An address check alone reports this as signed in.
+    CODEPAGE = b"""<!doctype html><html><body><h1>Check your phone</h1>
+      <form method="POST" action="/code">
+        <input autocomplete="one-time-code" name="code" id="code">
+        <button type="submit" id="go">Verify</button>
+      </form></body></html>"""
+
+    PRODUCT = b"""<!doctype html><html><body>
+      <nav><a href="/">Home</a></nav>
+      <h1>Accounts</h1>
+      <table><thead><tr><th>NAME</th><th>PLAN</th></tr></thead>
+      <tbody><tr><td>Example Account 1</td><td>Pro</td></tr></tbody></table>
+      <button id="save">Save</button>
+      <script>document.getElementById('save').onclick = () =>
+        fetch('/api/accounts/1', {method: 'PUT'});</script>
+      </body></html>"""
+
+    state = {"password": False, "code": False}
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, body, status=200):
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            if not state["password"]:
+                return self._send(LOGIN)
+            if not state["code"]:
+                return self._send(CODEPAGE)
+            return self._send(PRODUCT)
+
+        def do_POST(self):
+            n = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(n).decode()
+            if self.path == "/login":
+                state["password"] = True
+            elif self.path == "/code" and CODE in body:
+                state["code"] = True
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def _write(self):
+            writes.append(f"{self.command} {self.path}")
+            self.send_response(204)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        do_PUT = do_PATCH = do_DELETE = _write
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+
+    typed = {"n": 0}
+
+    def be_the_person(page, seconds_left):
+        """What a human does: reads the code off their phone and types it."""
+        if typed["n"] or not page.query_selector("#code"):
+            return
+        page.fill("#code", CODE)
+        page.click("#go")
+        typed["n"] += 1
+
+    try:
+        from verba.capture import Capture, Screen
+    except ImportError:
+        srv.shutdown()
+        raise SkipTest("playwright is not installed")
+
+    root = Path(tempfile.mkdtemp(prefix="verba-handoff-"))
+    session = root / ".verba" / "sessions" / "t.json"
+    site = {
+        "base_url": base,
+        "signed_in_when": "table",
+        "handoff": True,
+        "handoff_timeout_s": 60,
+        "storage_state": str(session),
+        "login": [
+            {"goto": "/"},
+            {"wait_for": "input"},
+            {"fill": 'input[autocomplete="username"]', "value": "ops@example.test"},
+            {"fill": 'input[autocomplete="current-password"]', "value": "hunter2"},
+            {"click": 'button[type="submit"]'},
+        ],
+    }
+    screens = [Screen(id="accounts", title="Accounts", sections=["accounts"],
+                      shot="accounts-1.png",
+                      steps=[{"goto": "/"}, {"wait_for": "table"}],
+                      extract={"columns": "table thead th"})]
+    cap = Capture(site, screens, root / "capture" / "run",
+                  headless=True, on_wait=be_the_person)
+    try:
+        manifest = cap.run(log=lambda *a: None)
+    finally:
+        srv.shutdown()
+
+    ok(cap.handed_over, "the crawl did not hand over, so it never waited")
+    eq(typed["n"], 1, "the person was asked for a code this many times: ")
+    cols = (manifest.get("screens") or {}).get("accounts", {}) \
+        .get("elements", {}).get("columns", [])
+    ok("NAME" in cols, f"the crawl never reached the product: {cols}")
+    ok(session.exists(), "the session was not saved, so it would ask again")
+    eq(writes, [], "the product was written to during the sign-in: ")
+    ok(cap.guard.phase == "readonly",
+       "the guard was left in its sign-in phase after the hand-over")
+    return (f"filled the password, waited, took the code, "
+            f"read {len(cols)} columns, saved the session")
+
+
 @check("the content model round-trips")
 def t_model():
     from verba.model import Section, parse_section
@@ -760,7 +916,8 @@ def main() -> int:
              t_neutral_edition,
              t_rewrites_keep_figures, t_no_tug_of_war, t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
              t_apply_and_describe_are_one_step,
-             t_readonly, t_readonly_live, t_model]
+             t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
+             t_model]
     for t in tests:
         t()
     width = max(len(n) for n, _, _ in results)

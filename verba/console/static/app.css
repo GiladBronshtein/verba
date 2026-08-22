@@ -1054,13 +1054,27 @@ h3.sub{font-size:14px;font-weight:600;margin:24px 0 8px}
    once a day on the right. It exists so the rail can do one job instead of
    three: with a section open the outline now has the whole rail rather than
    whatever was left under the appearance toggle. */
+/* Three tracks, and the outer two are equal, so the process sits in the middle
+   of the bar rather than in the middle of whatever is left over after the mark
+   and the tools. Those two are not the same width and never will be, so
+   "after the brand, before the tools" and "centred" are different places, and
+   only one of them looks deliberate.
+
+   The middle track is minmax(0, auto): it takes what it needs, and when the
+   window is too narrow it gives way and scrolls inside itself instead of
+   shouldering the mark off the front of the bar. */
 header.top {
-  display: flex; align-items: center; gap: var(--s4);
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: center; gap: var(--s4);
   padding: 0 var(--s4);
   height: 54px; flex: none;
   background: var(--rail);
   border-bottom: 1px solid var(--line);
 }
+header.top > .brand { justify-self: start; }
+header.top > .flow  { justify-self: center; }
+header.top > .tools { justify-self: end; }
 header.top .brand {
   display: flex; align-items: center; gap: 9px;
   color: inherit; text-decoration: none; flex: none;
@@ -1112,7 +1126,7 @@ header.top .scheme button { padding: 5px 7px; }
   display: flex; align-items: stretch; gap: 2px;
   /* shrink-to-fit, not fill: a track stretched to the width of the window is a
      bar with six things at one end of it and a lot of nothing after Publish */
-  flex: 0 1 auto; min-width: 0; margin-right: auto;
+  flex: 0 1 auto; min-width: 0;
   overflow-x: auto; scrollbar-width: none;
 }
 .flow::-webkit-scrollbar { display: none; }

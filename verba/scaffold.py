@@ -27,6 +27,8 @@ from .theme import available as themes_available
 AUTH_KINDS = {
     "form": "a username and password typed into the product's own sign-in page",
     "sso": "single sign-on, where you sign in once in a real browser",
+    "handoff": "a browser opens and you finish the sign-in yourself, second "
+               "factor and all, and the crawl carries on once you are through",
     "none": "no sign-in needed",
 }
 
@@ -376,13 +378,20 @@ literals: []
 
     def _environments(self) -> str:
         a = self.a
-        user = f"\n  user: {a.user}" if (a.user and a.auth == "form") else ""
+        user = (f"\n  user: {a.user}"
+                if (a.user and a.auth in ("form", "handoff")) else "")
         return f"""
 # Connections. Which system a crawl talks to, and how it gets in.
 #
 # Passwords are never stored here. A form login keeps its password in the login
 # keychain (`verba env password <id>`), and single sign-on keeps a browser
 # session under .verba/sessions instead of a password at all.
+#
+# `auth: handoff` is for a product that asks for a one-time code, a prompt on a
+# phone or a hardware key. A browser opens, the crawl fills in what it knows,
+# you finish the sign-in, and the run carries on by itself the moment the
+# product is on screen. The session is kept, so you are asked once and not
+# again until it lapses.
 #
 # `mask_required: true` refuses an unmasked crawl outright. Set it on anything
 # holding real customer data.

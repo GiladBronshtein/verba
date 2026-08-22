@@ -55,10 +55,11 @@ this machine.
 | `--no-mask` | Skip masking. Refused when the connection sets `mask_required` |
 | `--replay-steps` | Re-run the steps without re-photographing |
 | `--heal` | Let the model propose replacements for selectors that broke |
+| `--wait-for-signin` | Open a browser and wait for you to sign in, second factor and all, then carry on |
 | `--no-sweep` | Do not offer to fill gaps afterwards |
 
 ### `verba env list|use|verify|signin|password [id]`
-Connections. `verify` is what to run when a crawl fails: it separates the
+Connections, including the `handoff` mode for products that ask for a code. `verify` is what to run when a crawl fails: it separates the
 network, the credentials and the selectors. See
 [Connections and sign in](Connections-and-sign-in).
 

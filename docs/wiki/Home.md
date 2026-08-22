@@ -17,6 +17,7 @@ is the short one.
 
 | | |
 |---|---|
+| [Features](Features) | Everything it does, in one list |
 | [Installation](Installation) | Python, Chromium, and the optional writing extra |
 | [Your first document](Your-first-document) | `verba new`, and a PDF within two minutes |
 | [The loop](The-loop) | What runs, in what order, and what it refuses to decide |

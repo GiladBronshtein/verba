@@ -30,7 +30,16 @@ CONFIG = "content/environments.yaml"
 SESSIONS = ".verba/sessions"
 KEYCHAIN_PREFIX = "verba-env"
 
-AUTH_MODES = ("form", "sso", "none")
+AUTH_MODES = ("form", "sso", "handoff", "none")
+
+# What each mode means, in the words the console and the wizard use.
+AUTH_ABOUT = {
+    "form": "a username and password typed into the product's own sign-in page",
+    "sso": "single sign-on, signed in once in a real browser beforehand",
+    "handoff": "a browser opens and you finish the sign-in yourself, including "
+               "any second factor, and the crawl carries on once you are through",
+    "none": "no sign-in needed",
+}
 
 
 @dataclass
@@ -38,11 +47,14 @@ class Environment:
     id: str
     label: str = ""
     base_url: str = ""
-    auth: str = "form"                  # form | sso | none
+    auth: str = "form"                  # form | sso | handoff | none
     user: str = ""
     login_steps: list = field(default_factory=list)
     signed_in_when: str = ""            # selector proving a session is live
     mask_required: bool = False         # production data must never ship unmasked
+    # How long a handoff waits for the person before giving up. Long, because
+    # the thing being waited on is a human finding their phone.
+    signin_timeout_s: int = 300
     notes: str = ""
     # Which keychain entries this project's passwords live under. A project that
     # existed before the engine was renamed keeps its old prefix, so migrating
@@ -58,6 +70,7 @@ class Environment:
             login_steps=d.get("login_steps", []) or [],
             signed_in_when=d.get("signed_in_when", "") or "",
             mask_required=bool(d.get("mask_required", False)),
+            signin_timeout_s=int(d.get("signin_timeout_s", 300) or 300),
             notes=d.get("notes", "") or "",
         )
 
@@ -72,6 +85,8 @@ class Environment:
             d["signed_in_when"] = self.signed_in_when
         if self.mask_required:
             d["mask_required"] = True
+        if self.signin_timeout_s and self.signin_timeout_s != 300:
+            d["signin_timeout_s"] = self.signin_timeout_s
         if self.notes:
             d["notes"] = self.notes
         return d
@@ -89,7 +104,11 @@ class Environment:
         the username on a profile silently kept handing back the previous user's
         password while reporting the new username as signed in.
         """
-        if self.auth != "form":
+        # A handoff connection may store one too. It is used to fill the first
+        # page so the person only has to deal with the part a machine cannot do,
+        # and it is optional: a handoff with no password saved simply opens the
+        # sign-in page and waits.
+        if self.auth not in ("form", "handoff"):
             return None
         cmd = ["security", "find-generic-password", "-s", self.keychain_service]
         if self.user:
@@ -151,11 +170,13 @@ class Environment:
         a selector problem rather than a sign-in one.
         """
         import os
-        if self.auth != "form":
+        if self.auth not in ("form", "handoff"):
             return True
         pw = self.password()
         if not pw or not self.user:
-            return False
+            # A handoff does not need one. Whatever is missing, the person
+            # supplies in the browser.
+            return self.auth == "handoff"
         os.environ["VERBA_USER"] = self.user
         os.environ["VERBA_PASSWORD"] = pw
         return True
@@ -202,6 +223,14 @@ class Environment:
             return (True, f"signed in as {self.user}") if self.password() \
                 else (False, "no password saved")
         info = self.session_info(root)
+        if self.auth == "handoff":
+            # Never "not ready". A missing or expired session is not a fault
+            # here, it is the normal state before somebody signs in, and the
+            # crawl knows how to ask. Reporting it as a blocker sent people off
+            # to fix a connection that was working exactly as designed.
+            if info.get("present") and not info.get("expired"):
+                return True, f"session saved {info.get('saved_at')}"
+            return True, "you will be asked to sign in when the crawl starts"
         if not info.get("present"):
             return False, "not signed in yet"
         if info.get("expired"):
@@ -289,6 +318,15 @@ class Environments:
         if env.auth == "form":
             site["login"] = (env.login_steps or fallback_login
                              or DEFAULT_FORM_LOGIN)
+        elif env.auth == "handoff":
+            # Both. The steps fill the first page so the person only deals with
+            # the part a machine cannot do, and the session is where the result
+            # is kept so nobody is asked twice.
+            site["login"] = (env.login_steps or fallback_login
+                             or DEFAULT_FORM_LOGIN)
+            site["storage_state"] = str(env.session_path(self.root))
+            site["handoff"] = True
+            site["handoff_timeout_s"] = env.signin_timeout_s
         else:
             site["login"] = []
             site["storage_state"] = str(env.session_path(self.root))
@@ -301,8 +339,10 @@ class Environments:
             out.append({
                 **e.to_dict(), "active": e.id == self.active,
                 "ready": ok, "status": why,
-                "session": e.session_info(self.root) if e.auth == "sso" else None,
-                "has_password": bool(e.password()) if e.auth == "form" else None,
+                "session": e.session_info(self.root)
+                if e.auth in ("sso", "handoff") else None,
+                "has_password": bool(e.password())
+                if e.auth in ("form", "handoff") else None,
             })
         return out
 

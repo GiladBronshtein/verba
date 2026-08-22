@@ -2897,7 +2897,8 @@ function envCard(e) {
   head.append(el('div', null, `
     <b>${esc(e.label || e.id)}</b>
     ${e.active ? '<span class="chip verified">in use</span>' : ''}
-    <span class="chip">${esc(e.auth === 'sso' ? 'single sign-on' : e.auth)}</span>
+    <span class="chip">${esc({ sso: 'single sign-on',
+      handoff: 'you sign in when asked', none: 'no sign-in' }[e.auth] || e.auth)}</span>
     ${e.mask_required ? '<span class="chip warn">masking required</span>' : ''}
     <div class="muted" style="margin-top:3px">${esc(e.base_url || 'no address set')}</div>
     <div class="muted" style="display:flex;align-items:center;gap:5px">
@@ -2916,8 +2917,8 @@ function envCard(e) {
   const mk = (label, cls, fn) => { const b = el('button', 'act ' + (cls || ''), label);
     b.onclick = fn; row.append(b); return b; };
 
-  if (e.auth === 'sso') {
-    mk('Sign in with Okta', 'primary', async () => {
+  if (e.auth === 'sso' || e.auth === 'handoff') {
+    mk(e.auth === 'handoff' ? 'Sign in now' : 'Sign in with Okta', 'primary', async () => {
       try {
         const r = await api('/api/env/signin', { method: 'POST', json: { id: e.id } });
         watchJob(r.job, `sign in to ${e.label || e.id}`);
@@ -2925,7 +2926,7 @@ function envCard(e) {
       } catch (err) { toast(err.message, true); }
     });
   }
-  mk('Verify', e.auth === 'sso' ? '' : 'primary', async () => {
+  mk('Verify', (e.auth === 'sso' || e.auth === 'handoff') ? '' : 'primary', async () => {
     try {
       const r = await api('/api/env/verify', { method: 'POST', json: { id: e.id } });
       watchJob(r.job, `verify ${e.label || e.id}`);
@@ -2975,6 +2976,7 @@ function envForm(e, isNew) {
       <select id="${uid}auth">
         <option value="form" ${e.auth === 'form' ? 'selected' : ''}>Username and password</option>
         <option value="sso" ${e.auth === 'sso' ? 'selected' : ''}>Single sign-on (Okta)</option>
+        <option value="handoff" ${e.auth === 'handoff' ? 'selected' : ''}>I sign in myself, when asked</option>
         <option value="none" ${e.auth === 'none' ? 'selected' : ''}>No sign-in needed</option>
       </select></div>`;
   f.append(g);
@@ -3001,12 +3003,20 @@ function envForm(e, isNew) {
 
   const note = el('div', 'muted'); note.style.marginTop = '8px';
   const syncNote = () => {
-    const sso = $('#' + uid + 'auth').value === 'sso';
-    creds.style.display = sso ? 'none' : '';
-    note.innerHTML = sso
-      ? 'Single sign-on stores no password. After saving, use <b>Sign in with Okta</b>: ' +
-        'a browser window opens, you sign in yourself, and the session is saved.'
-      : 'The password is written to your login keychain, never to a file.';
+    const how = $('#' + uid + 'auth').value;
+    creds.style.display = how === 'sso' || how === 'none' ? 'none' : '';
+    note.innerHTML = {
+      sso: 'Single sign-on stores no password. After saving, use <b>Sign in with Okta</b>: ' +
+           'a browser window opens, you sign in yourself, and the session is saved.',
+      handoff: 'For a product that asks for a code, a prompt on your phone, or a ' +
+               'security key. A browser opens when a crawl needs it, Verba fills in ' +
+               'whatever you have saved here, and you finish. The crawl carries on ' +
+               'by itself the moment the product is on screen, and the session is ' +
+               'kept so you are not asked again until it lapses. Username and ' +
+               'password are both optional.',
+      none: 'Nothing is stored, because nothing is needed.',
+      form: 'The password is written to your login keychain, never to a file.'
+    }[how] || '';
   };
   f.append(note);
   setTimeout(() => { $('#' + uid + 'auth').onchange = syncNote; syncNote(); }, 0);

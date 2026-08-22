@@ -78,6 +78,7 @@ on a Tuesday is working, not lost.
 | | |
 |---|---|
 | **Crawl a live system** | Signs in, walks every screen, photographs it at a fixed viewport, reads the labels off the page |
+| **Wait for you, when it must** | Two-factor, a prompt on your phone, a hardware key: a browser opens, Verba fills what it knows, you finish, and the crawl carries on by itself |
 | **Detect drift** | Compares those labels with what your sections claim. Renames are detected as renames, not a deletion plus an addition |
 | **Fingerprint screenshots** | A changed screen is flagged even when no label moved |
 | **Fix what can be fixed** | Applies mechanical changes, writes missing descriptions from evidence, rewrites what the rules object to, adopts fresh pictures |
@@ -111,6 +112,7 @@ pictures.
 | **Masks real names** | Rewrites customer names and identifiers in the DOM immediately before each screenshot |
 | **Stable placeholders** | One real value always becomes the same placeholder, so figures never contradict each other |
 | **Refuses unmasked production** | A connection marked as holding real data cannot be captured unmasked |
+| **Closes the one open window** | While you finish a sign-in yourself, writes are permitted. That ends the instant the product appears, not at the end of the crawl |
 | **Locked, atomic writes** | Two consoles cannot lose each other's work |
 | **Everything reversible** | Every change is in History, by whom, with a diff and a restore |
 
@@ -294,6 +296,47 @@ stored, so one real value always becomes the same placeholder.
 Masking protects what a crawl takes and says nothing about a picture that
 arrived some other way. Those are found, reported, and looked at.
 
+## When signing in needs a human
+
+Plenty of products ask for something a machine cannot produce: a one-time code,
+a prompt on a phone, a hardware key. Those used to be the end of the crawl.
+
+```yaml
+  - id: production
+    auth: handoff
+    user: docs@example.com     # optional
+```
+
+A browser opens, Verba fills in the boring half, and then **stops and waits for
+you**. The moment the product is on screen the crawl carries on by itself, in
+the same run, and the session is saved so nobody is asked twice.
+
+```
+  over to you: finish signing in in the browser window,
+  including any code, prompt or key. The crawl carries on
+  by itself the moment the product is on screen.
+    waiting for you to sign in, 4m 58s left
+    signed in
+  session saved, the next crawl will not ask (production.json)
+read-only guard armed: writes are blocked from here on
+  captured accounts.list in 1.1s via steps  [columns=6]
+```
+
+For one run on a connection you have not changed yet:
+
+```bash
+verba capture --wait-for-signin
+```
+
+An expired session asks rather than fails, and a login step that breaks because
+the product just started asking for a code hands over rather than stopping: that
+is exactly the case a person is there for.
+
+The window while you are driving is the one time writes are permitted, and it
+closes when the product appears rather than when the crawl ends. There is a test
+that stands up a server insisting on a code, plays the person, and then checks
+the server received nothing.
+
 ---
 
 ## Editions
@@ -375,6 +418,7 @@ To watch drift appear, change Meridian: rename a column in
 | `verba console` | the management interface, and the easiest way in |
 | `verba status` | every section with status, freshness and open drift |
 | `verba capture` | crawl the live system into a timestamped run |
+| `verba capture --wait-for-signin` | wait while you sign in, second factor and all |
 | `verba drift` | compare the newest capture to the document |
 | `verba fix` | settle everything the system can, and say what is left |
 | `verba fix --full` | photograph every screen first, then do that |
@@ -430,16 +474,19 @@ silently discarding every section's own note.
 
 ## Documentation
 
-The [wiki](https://github.com/GiladBronshtein/verba/wiki) is the long form.
+The [wiki](https://github.com/GiladBronshtein/verba/wiki) is the long form, and
+**[Features](https://github.com/GiladBronshtein/verba/wiki/Features)** is
+everything it does in one list.
 
 | | | |
 |---|---|---|
-| [Installation](https://github.com/GiladBronshtein/verba/wiki/Installation) | [Your first document](https://github.com/GiladBronshtein/verba/wiki/Your-first-document) | [The loop](https://github.com/GiladBronshtein/verba/wiki/The-loop) |
-| [Project layout](https://github.com/GiladBronshtein/verba/wiki/Project-layout) | [Sections](https://github.com/GiladBronshtein/verba/wiki/Sections) | [Screens registry](https://github.com/GiladBronshtein/verba/wiki/Screens-registry) |
-| [Connections and sign in](https://github.com/GiladBronshtein/verba/wiki/Connections-and-sign-in) | [Masking and names](https://github.com/GiladBronshtein/verba/wiki/Masking-and-names) | [Editions](https://github.com/GiladBronshtein/verba/wiki/Editions) |
-| [Themes and layout](https://github.com/GiladBronshtein/verba/wiki/Themes-and-layout) | [The writer](https://github.com/GiladBronshtein/verba/wiki/The-writer) | [The read only guarantee](https://github.com/GiladBronshtein/verba/wiki/The-read-only-guarantee) |
-| [Healing selectors](https://github.com/GiladBronshtein/verba/wiki/Healing-selectors) | [Rule reference](https://github.com/GiladBronshtein/verba/wiki/Rule-reference) | [CLI reference](https://github.com/GiladBronshtein/verba/wiki/CLI-reference) |
-| [Console guide](https://github.com/GiladBronshtein/verba/wiki/Console-guide) | [Architecture](https://github.com/GiladBronshtein/verba/wiki/Architecture) | [Troubleshooting](https://github.com/GiladBronshtein/verba/wiki/Troubleshooting) |
+| [Features](https://github.com/GiladBronshtein/verba/wiki/Features) | [Installation](https://github.com/GiladBronshtein/verba/wiki/Installation) | [Your first document](https://github.com/GiladBronshtein/verba/wiki/Your-first-document) |
+| [The loop](https://github.com/GiladBronshtein/verba/wiki/The-loop) | [Console guide](https://github.com/GiladBronshtein/verba/wiki/Console-guide) | [Project layout](https://github.com/GiladBronshtein/verba/wiki/Project-layout) |
+| [Sections](https://github.com/GiladBronshtein/verba/wiki/Sections) | [Screens registry](https://github.com/GiladBronshtein/verba/wiki/Screens-registry) | [Connections and sign in](https://github.com/GiladBronshtein/verba/wiki/Connections-and-sign-in) |
+| [Masking and names](https://github.com/GiladBronshtein/verba/wiki/Masking-and-names) | [Editions](https://github.com/GiladBronshtein/verba/wiki/Editions) | [Themes and layout](https://github.com/GiladBronshtein/verba/wiki/Themes-and-layout) |
+| [The writer](https://github.com/GiladBronshtein/verba/wiki/The-writer) | [The read only guarantee](https://github.com/GiladBronshtein/verba/wiki/The-read-only-guarantee) | [Healing selectors](https://github.com/GiladBronshtein/verba/wiki/Healing-selectors) |
+| [Rule reference](https://github.com/GiladBronshtein/verba/wiki/Rule-reference) | [CLI reference](https://github.com/GiladBronshtein/verba/wiki/CLI-reference) | [Architecture](https://github.com/GiladBronshtein/verba/wiki/Architecture) |
+| [Troubleshooting](https://github.com/GiladBronshtein/verba/wiki/Troubleshooting) | [FAQ](https://github.com/GiladBronshtein/verba/wiki/FAQ) | [Contributing](https://github.com/GiladBronshtein/verba/wiki/Contributing) |
 
 Its source is `docs/wiki/` in this repository, so wiki pages are reviewed in
 pull requests like anything else and published with `tools/publish-wiki.sh`.

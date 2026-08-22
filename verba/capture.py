@@ -168,8 +168,17 @@ class Capture:
 
     def __init__(self, site: dict, screens: list[Screen], out_dir: Path,
                  headless: bool = True, masker: Masker | None = None,
-                 routes_path: Path | None = None, healer: Healer | None = None):
+                 routes_path: Path | None = None, healer: Healer | None = None,
+                 handoff: bool | None = None, on_wait=None):
         self.site = site
+        # A hand-over is how a sign-in that a machine cannot finish gets
+        # finished: the crawl fills what it knows, a person deals with the
+        # second factor, and the run carries on. It forces a visible browser,
+        # because waiting for somebody in a headless one is waiting forever.
+        self.handoff = bool(site.get("handoff") if handoff is None else handoff)
+        self.handoff_timeout_s = int(site.get("handoff_timeout_s", 300) or 300)
+        self.on_wait = on_wait
+        self.handed_over = False
         self.screens = screens
         self.out_dir = Path(out_dir)
         self.headless = headless
@@ -235,20 +244,60 @@ class Capture:
         else:
             raise ValueError(f"unknown capture step: {step}")
 
-    def login(self, page, log=None):
-        for step in self.site.get("login", []) or []:
-            self._run_step(page, step, phase="login", log=log)
+    def _session_still_works(self, page, emit) -> bool:
+        """Does the saved session actually get us in, or has it lapsed?"""
         marker = self.site.get("signed_in_when") or "nav a, aside a, [role=tab], table"
-        from .signin import await_signed_in
-        if await_signed_in(page, marker, log=log):
-            if log:
-                log("  signed in")
-        else:
-            # Failing here loudly beats twenty selector timeouts that each look
-            # like a broken screen when the real fault is one sign-in.
+        base = (self.site.get("base_url") or "").rstrip("/")
+        try:
+            page.goto(base or "/", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector(marker, timeout=8000)
+            return True
+        except Exception:
+            return False
+
+    def login(self, page, log=None):
+        emit = log or (lambda *_: None)
+        for step in self.site.get("login", []) or []:
+            try:
+                self._run_step(page, step, phase="login", log=log)
+            except Exception as e:
+                if not self.handoff:
+                    raise
+                # A hand-over fills in what it can and no more. A product that
+                # has just started asking for a code will fail on a step that
+                # worked last week, and that is not a reason to stop: it is
+                # exactly the case a person is here for.
+                emit(f"    could not do that step, leaving it to you: "
+                     f"{type(e).__name__}")
+                break
+        marker = self.site.get("signed_in_when") or "nav a, aside a, [role=tab], table"
+        from .signin import await_signed_in, hand_over
+        if await_signed_in(page, marker, timeout_ms=8000 if self.handoff else 30000,
+                           log=log):
+            self.guard.reached_product()
+            emit("  signed in")
+            return
+
+        if self.handoff:
+            emit("")
+            emit("  over to you: finish signing in in the browser window,")
+            emit("  including any code, prompt or key. The crawl carries on")
+            emit("  by itself the moment the product is on screen.")
+            ok = hand_over(page, marker, timeout_s=self.handoff_timeout_s,
+                           log=emit, tick=self.on_wait)
+            if ok:
+                self.guard.reached_product()
+                self.handed_over = True
+                return
             raise RuntimeError(
-                f"sign-in did not reach the product, still on {page.url}. "
-                f"Check the credentials for this connection.")
+                f"nobody finished signing in within "
+                f"{self.handoff_timeout_s // 60} minutes, still on {page.url}.")
+
+        # Failing here loudly beats twenty selector timeouts that each look
+        # like a broken screen when the real fault is one sign-in.
+        raise RuntimeError(
+            f"sign-in did not reach the product, still on {page.url}. "
+            f"Check the credentials for this connection.")
 
     # -- main -------------------------------------------------------------
     def run(self, only: list[str] | None = None, log=None, prefer_url: bool = True) -> dict:
@@ -257,24 +306,61 @@ class Capture:
         emit = log or (lambda *_: None)
         started = datetime.now().isoformat(timespec="seconds")
 
+        state = self.site.get("storage_state")
+        have_session = bool(state and Path(state).exists())
+        # Waiting for a person in a browser they cannot see is waiting forever.
+        # Unless the caller brought its own way of finishing the sign-in, which
+        # is what `on_wait` is: the console's progress hook, or a test standing
+        # in for the person. Then there is nobody to show a window to.
+        needs_a_window = self.handoff and not have_session and self.on_wait is None
+        headless = self.headless and not needs_a_window
+        if needs_a_window and self.headless:
+            emit("opening a visible browser: this connection asks you to sign in")
+
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=self.headless)
+            browser = pw.chromium.launch(headless=headless)
             ctx_args = {"viewport": VIEWPORT, "device_scale_factor": 1}
-            state = self.site.get("storage_state")
-            if state and Path(state).exists():
+            if have_session:
                 ctx_args["storage_state"] = state
             ctx = browser.new_context(**ctx_args)
             page = ctx.new_page()
             page.set_default_timeout(DEFAULT_TIMEOUT)
             self.guard.attach(page, log=emit)
 
-            if state and Path(state).exists():
-                # Single sign-on: the session was captured interactively, so there
-                # is no form to fill and no password anywhere in this process.
+            if have_session:
+                # The session was captured interactively, so there is no form to
+                # fill and no password anywhere in this process.
                 emit(f"using the saved sign-in session ({Path(state).name})")
+                if self.handoff and not self._session_still_works(page, emit):
+                    # An expired session used to end the run. On a connection
+                    # that already knows how to ask a person, ending the run is
+                    # the one thing there is no reason to do.
+                    emit("  that session has expired")
+                    ctx.close()
+                    if headless:
+                        browser.close()
+                        browser = pw.chromium.launch(headless=False)
+                    ctx = browser.new_context(viewport=VIEWPORT,
+                                              device_scale_factor=1)
+                    page = ctx.new_page()
+                    page.set_default_timeout(DEFAULT_TIMEOUT)
+                    self.guard.attach(page, log=emit)
+                    self.login(page, log=emit)
             else:
                 emit("signing in ...")
                 self.login(page, log=emit)
+
+            if self.handed_over and state:
+                # Nobody should be asked twice. Saving here is what turns a
+                # hand-over into a one-off rather than a habit.
+                try:
+                    Path(state).parent.mkdir(parents=True, exist_ok=True)
+                    ctx.storage_state(path=str(state))
+                    emit(f"  session saved, the next crawl will not ask "
+                         f"({Path(state).name})")
+                except Exception as e:
+                    emit(f"  could not save the session: {e}")
+
             self.guard.lock()
             emit("read-only guard armed: writes are blocked from here on")
 
@@ -327,6 +413,7 @@ class Capture:
             "screens": self.inventory,
             "errors": self.errors,
             "readonly": self.guard.report(),
+            "signin": {"handoff": self.handoff, "handed_over": self.handed_over},
             "masking": self.masker.summary(),
             "healing": {**self.healer.summary(),
                         "proposals": self.healer.proposals()},

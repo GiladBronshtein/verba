@@ -13,7 +13,6 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime
 from pathlib import Path
 
 from .readonly import Guard
@@ -78,6 +77,81 @@ def await_signed_in(page, marker: str, timeout_ms: int = 30000, log=None) -> boo
     return False
 
 
+# Fields that mean the sign-in is not finished, whatever the address says. A
+# one-time-code page often lives on the same path as the password page and has
+# already redirected off /login, so the address alone reports success while the
+# product is still two steps away.
+PENDING_FIELDS = ('input[autocomplete="current-password"], '
+                  'input[autocomplete="one-time-code"], '
+                  'input[type="password"], '
+                  'input[name*="otp" i], input[name*="code" i], '
+                  'input[id*="otp" i], input[id*="code" i]')
+
+
+def hand_over(page, marker: str, timeout_s: int = 300, log=None,
+              tick=None, poll_ms: int = 400) -> bool:
+    """Stop, and let the person finish signing in.
+
+    This is the answer to every sign-in a machine cannot complete: a one-time
+    code, a push notification, a hardware key, a picture of a bus. Verba fills
+    in what it knows, and then gets out of the way until the product is on
+    screen.
+
+    Returns True once the product is reached. `tick(page, seconds_left)` is
+    called on every poll, which is how the console streams progress and how the
+    tests stand in for the person.
+
+    The poll is deliberately short. Between the moment somebody finishes signing
+    in and the moment this notices, the browser is still in its sign-in phase
+    and a write would be permitted, so that window should be small and every
+    request inside it is recorded in the manifest.
+    """
+    emit = log or (lambda *_: None)
+    deadline = time.monotonic() + timeout_s
+    last_note = ""
+    announced = 0
+
+    while time.monotonic() < deadline:
+        left = int(deadline - time.monotonic())
+        try:
+            url = page.url
+        except Exception:
+            break
+
+        here = "identity provider" if _on_idp(url) else "product"
+        if here != last_note:
+            emit(f"    now on the {here}: {url[:90]}")
+            last_note = here
+
+        if not _on_idp(url):
+            try:
+                pending = page.query_selector(PENDING_FIELDS)
+            except Exception:
+                pending = None
+            if not pending:
+                try:
+                    if page.query_selector(marker):
+                        emit("    signed in")
+                        return True
+                except Exception:
+                    pass
+
+        # A minute at a time, so a long wait does not look like a hang.
+        if left // 60 != announced // 60 or announced == 0:
+            announced = left
+            emit(f"    waiting for you to sign in, {left // 60}m {left % 60:02d}s left")
+
+        if tick:
+            try:
+                tick(page, left)
+            except Exception as e:      # a caller's progress hook must never
+                emit(f"    (waiting: {e})")   # be able to fail a sign-in
+        page.wait_for_timeout(poll_ms)
+
+    emit(f"    gave up waiting after {timeout_s // 60} minutes")
+    return False
+
+
 def interactive_signin(env, root: Path, log=None, timeout_s: int = 300) -> dict:
     """Open a browser, wait for the person to sign in, save the session."""
     from playwright.sync_api import sync_playwright
@@ -102,28 +176,10 @@ def interactive_signin(env, root: Path, log=None, timeout_s: int = 300) -> dict:
         page = ctx.new_page()
         page.goto(target, wait_until="domcontentloaded", timeout=60000)
 
-        deadline = datetime.now().timestamp() + timeout_s
-        saved = False
-        last_note = ""
-        while datetime.now().timestamp() < deadline:
-            try:
-                url = page.url
-            except Exception:
-                break
-            here = "identity provider" if _on_idp(url) else "product"
-            if here != last_note:
-                emit(f"  now on the {here}: {url[:90]}")
-                last_note = here
-            if not _on_idp(url):
-                try:
-                    page.wait_for_selector(marker, timeout=2500)
-                    ctx.storage_state(path=str(session))
-                    saved = True
-                    emit(f"  signed in, session saved to {session.name}")
-                    break
-                except Exception:
-                    pass
-            page.wait_for_timeout(1500)
+        saved = hand_over(page, marker, timeout_s=timeout_s, log=emit)
+        if saved:
+            ctx.storage_state(path=str(session))
+            emit(f"  signed in, session saved to {session.name}")
 
         if not saved:
             try:
@@ -155,10 +211,14 @@ def verify(env, root: Path, log=None) -> dict:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         kwargs = {"viewport": VIEWPORT}
-        if env.auth == "sso":
+        if env.auth in ("sso", "handoff"):
             sp = env.session_path(root)
             if not sp.exists():
                 browser.close()
+                if env.auth == "handoff":
+                    return {"ok": True, "pending": True,
+                            "reason": "nobody has signed in yet. The next crawl "
+                                      "will open a browser and wait for you."}
                 return {"ok": False, "reason": "no saved session, sign in first"}
             kwargs["storage_state"] = str(sp)
             emit("using the saved browser session")
@@ -203,7 +263,10 @@ def verify(env, root: Path, log=None) -> dict:
             if _on_idp(url):
                 result = {"ok": False, "url": url,
                           "reason": "the identity provider is still asking to sign in. "
-                                    "The saved session has expired, sign in again."}
+                                    "The saved session has expired, sign in again."
+                          if env.auth != "handoff" else
+                          "the saved session has expired. The next crawl will open "
+                          "a browser and wait for you to sign in again."}
             else:
                 try:
                     page.wait_for_selector(marker, timeout=8000)

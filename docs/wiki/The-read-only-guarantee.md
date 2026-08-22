@@ -73,6 +73,31 @@ some products label a control "Apply filters". Add `opens_form: true` to a step
 that opens a form rather than committing one, and the advisory goes away while
 the guard stays exactly as it was.
 
+## The one time a person is driving
+
+A [hand over](Connections-and-sign-in) puts you at the keyboard **inside** the
+sign-in phase, which is the phase where writes are permitted, and you have a
+mouse. That is a real hole, so it is closed deliberately rather than hoped over.
+
+The guard stops permitting writes the moment the product appears, before the
+crawl resumes and before `lock()` runs:
+
+```python
+def reached_product(self):
+    """The sign-in landed. Stop permitting writes, before `lock()` runs."""
+    self.at_product = True
+```
+
+The wait polls every 400ms, so the window between finishing a sign-in and that
+being noticed is under half a second, and every request inside it is in the
+manifest with its method and URL. There is no window in which Verba is both
+crawling and permitting writes.
+
+The check for "signed in" is deliberately not the address. A one-time-code page
+often lives on the same path as the password page and has already redirected off
+`/login`, so an address check reports success while the product is still two
+steps away. The test asserts exactly that case.
+
 ## The test
 
 Not a mock. A real server that records what it receives, a real browser driven

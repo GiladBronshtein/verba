@@ -26,13 +26,14 @@ environments:
 |---|---|
 | `id` | What you pass to `verba env use` |
 | `base_url` | Where the crawl goes. Screens use paths relative to this |
-| `auth` | `form`, `sso` or `none` |
+| `auth` | `form`, `sso`, `handoff` or `none` |
 | `user` | The account the crawl signs in as. Never the password |
 | `signed_in_when` | A selector that proves a session is live |
 | `mask_required` | `true` refuses an unmasked crawl outright |
 | `keychain_prefix` | Which keychain entries this project's passwords live under |
+| `signin_timeout_s` | How long a hand over waits for you. Default 300 |
 
-## The three ways in
+## The four ways in
 
 ### form
 
@@ -64,6 +65,66 @@ again when they do.
 
 `.verba/sessions` is a credential. The scaffold's `.gitignore` excludes it.
 Keep it that way.
+
+### handoff
+
+**For a product that asks for something a machine cannot produce**: a one-time
+code, a prompt on your phone, a hardware key, a picture of a bus.
+
+```yaml
+  - id: production
+    label: Production
+    base_url: https://app.example.com
+    auth: handoff
+    user: docs@example.com        # optional
+    signed_in_when: "[data-testid=user-menu]"
+    signin_timeout_s: 300
+```
+
+A browser opens. Verba fills in whatever it knows, which is the boring half, and
+then **stops and waits for you** to finish. The moment the product is on screen
+the crawl carries on by itself, in the same run, and the session is saved so
+nobody is asked again until it lapses.
+
+```
+signing in ...
+    sign-in request allowed: POST https://app.example.com/login
+
+  over to you: finish signing in in the browser window,
+  including any code, prompt or key. The crawl carries on
+  by itself the moment the product is on screen.
+    waiting for you to sign in, 4m 58s left
+    signed in
+  session saved, the next crawl will not ask (production.json)
+read-only guard armed: writes are blocked from here on
+  captured accounts.list in 1.1s via steps  [columns=6]
+```
+
+Username and password are both optional. With neither, the browser simply opens
+at the sign-in page and waits. With both, you only deal with the second factor.
+
+Three details that matter:
+
+- **A step that fails does not stop the run.** A product that has just started
+  asking for a code will fail on a step that worked last week, and that is not a
+  reason to stop: it is exactly the case a person is here for.
+- **An expired session asks rather than fails.** Every other mode ends the run.
+  On a connection that already knows how to ask a person, ending the run is the
+  one thing there is no reason to do.
+- **The permitted-write window closes at the product, not at the end.** While you
+  are signing in, the browser is in its sign-in phase, where writes are allowed,
+  and you have a mouse. Verba stops permitting them the instant the product
+  appears, before it resumes. See
+  [The read only guarantee](The-read-only-guarantee).
+
+Force it on any connection for one run:
+
+```bash
+verba capture --wait-for-signin
+```
+
+That is the flag for the morning your product starts asking for a code and you
+have not changed the connection yet.
 
 ### none
 

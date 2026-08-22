@@ -46,6 +46,11 @@ class Guard:
     phase: str = "login"                 # login | readonly
     blocked: list = field(default_factory=list)
     allowed_posts: list = field(default_factory=list)
+    # Set the moment a hand-over reaches the product, before `lock()` runs. A
+    # person driving the browser through a second factor is inside the sign-in
+    # phase, where writes are permitted, and they have a mouse. Narrowing the
+    # phase the instant the product appears keeps that window to one poll.
+    at_product: bool = False
     _log = None
 
     def attach(self, page, log=None):
@@ -65,7 +70,7 @@ class Guard:
         # Sign-in is the one write the crawler is allowed to perform, and only
         # while the login steps are running. Every one is recorded and reported,
         # so the single permitted exception stays auditable.
-        if self.phase == "login":
+        if self.phase == "login" and not self.at_product:
             entry = f"{method} {request.url}"
             self.allowed_posts.append(entry)
             if self._log:
@@ -82,13 +87,20 @@ class Guard:
             self._log(f"    blocked write: {entry[:150]}")
         return route.abort()
 
+    def reached_product(self):
+        """The sign-in landed. Stop permitting writes, before `lock()` runs."""
+        self.at_product = True
+        return self
+
     def lock(self):
         """Leave the sign-in phase. From here nothing may write."""
         self.phase = "readonly"
+        self.at_product = True
         return self
 
     def report(self) -> dict:
         return {"blocked_writes": len(self.blocked),
+                "sign_in_writes": len(self.allowed_posts),
                 "blocked": self.blocked[:50],
                 "sign_in_requests": len(self.allowed_posts),
                 "sign_in_detail": self.allowed_posts[:20],

@@ -405,6 +405,9 @@ class ConsoleState:
             log(f"output   : capture/{stamp}")
             log(f"masking  : {'on' if masker.active() else 'OFF, real names will be captured'}")
             log("writes   : blocked at the network layer once sign-in completes")
+            if site.get("handoff"):
+                log("sign-in  : a browser window opens if this crawl needs you. "
+                    "Finish there, second factor and all, and it carries on.")
             for w in lint_screens(targets):
                 log(f"  registry warning: {w}")
             log("launching chromium at 1440x768 ...")
@@ -421,6 +424,9 @@ class ConsoleState:
             ro = manifest["readonly"]
             log(f"read-only: {ro['blocked_writes']} write attempt(s) blocked, "
                 f"{ro['sign_in_requests']} sign-in request(s) allowed")
+            if (manifest.get("signin") or {}).get("handed_over"):
+                log("sign-in  : you signed in, and the session was saved. "
+                    "The next crawl will not ask.")
             mk = manifest["masking"]
             log(f"masking  : {mk['known_values']} value(s) masked, "
                 f"{mk['new_values']} newly learned")

@@ -5,6 +5,7 @@
     verba build                  render DOCX and HTML preview
     verba capture                crawl the live system, write a capture run
     verba capture --section ID   re-crawl only the screens one section uses
+verba capture --wait-for-signin   wait while you sign in, second factor and all
     verba sweep                  review the crawl and propose the gaps filled
     verba fonts                  which typefaces the outputs are set in
     verba forms                  every form, field and rule the crawl read
@@ -191,6 +192,8 @@ def cmd_capture(args):
             print(f"{env.label or env.id}: {why}")
             print(f"fix it with: python3 -m verba env "
                   f"{'signin' if env.auth == 'sso' else 'password'} {env.id}")
+            print("or, if this product asks for a code: python3 -m verba capture "
+                  "--wait-for-signin")
             return 1
         site = {**site, **envs.as_site(env, fallback_login=site.get("login"))}
         if not env.export_credentials():
@@ -226,8 +229,16 @@ def cmd_capture(args):
     stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
     out = root / "capture" / stamp
     healer = Healer(enabled=bool(args.heal))
+    handoff = True if getattr(args, "wait_for_signin", False) else None
+    if handoff:
+        # Asked for by hand, so it applies whatever the connection says. This is
+        # the flag for the morning a product starts asking for a code.
+        site = {**site, "handoff": True}
     cap = Capture(site, screens, out, headless=not args.headed, masker=masker,
-                  routes_path=content / "routes.yaml", healer=healer)
+                  routes_path=content / "routes.yaml", healer=healer,
+                  handoff=handoff)
+    if cap.handoff:
+        print("this crawl will wait for you to sign in if it needs to")
     print(f"capturing {len(only or screens)} screen(s) from {site.get('base_url')}")
     print(f"masking {'on' if masker.active() else 'off'}, "
           f"writes blocked, output capture/{stamp}")
@@ -322,10 +333,14 @@ def cmd_env(args):
         return 0 if r.get("ok") else 1
 
     if args.action == "signin":
-        if env.auth != "sso":
-            print("interactive sign-in is for single sign-on profiles. A form "
-                  "profile just needs its password saved.")
+        if env.auth not in ("sso", "handoff"):
+            print("interactive sign-in is for single sign-on and hand-over "
+                  "profiles. A form profile just needs its password saved.")
             return 1
+        if env.auth == "handoff":
+            # Doing it now rather than in the middle of a crawl. The crawl would
+            # ask on its own, so this is a convenience, not a prerequisite.
+            print("signing in now, so the next crawl does not have to ask.")
         from .signin import interactive_signin
         interactive_signin(env, Path(args.root), log=print)
         return 0
@@ -669,7 +684,7 @@ def cmd_new(args):
         given["about"] = _ask("What does it do, in one sentence?", "")
         given["base_url"] = _ask("Where does it live?", "https://example.com")
         given["auth"] = _ask("How do you sign in?", "form", AUTH_KINDS)
-        if given["auth"] == "form":
+        if given["auth"] in ("form", "handoff"):
             given["user"] = _ask("Which account will the crawl use?", "")
         looks = {n: Theme.named(n).about.strip().split(".")[0] + "."
                  for n in themes_available()}
@@ -1313,6 +1328,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="ignore remembered routes and click through from scratch")
     c.add_argument("--heal", action="store_true",
                    help="let the model repair selectors that stop resolving")
+    c.add_argument("--wait-for-signin", action="store_true",
+                   help="open a browser and wait for you to sign in, including "
+                        "any second factor, then carry on")
     c.add_argument("--no-sweep", dest="sweep", action="store_false",
                    help="skip the review pass over what the crawl produced")
     c.set_defaults(sweep=True)

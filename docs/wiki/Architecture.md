@@ -93,7 +93,7 @@ crashed reading a truncated file. The test that proves it is `t_atomic_writes`.
 python tools/selftest.py
 ```
 
-Twenty tests, and the shape of them is the point: the suite **builds a project
+Twenty-one tests, and the shape of them is the point: the suite **builds a project
 from scratch with the wizard** and tests the engine against that, rather than
 against a hand made fixture. An engine whose whole claim is that it works on a
 product it has never seen should be tested that way.
@@ -103,6 +103,7 @@ The ones that exist because something actually went wrong:
 | Test | Guards |
 |---|---|
 | `t_readonly`, `t_readonly_live` | The guard, against a real server and a real browser |
+| `t_handoff_waits_for_the_person` | A two-factor sign-in: fills what it knows, waits, resumes, saves the session, and is read-only again |
 | `t_rewrites_keep_figures` | A rewrite may not drop a figure |
 | `t_no_tug_of_war` | The decider and the sweep may not fight over the same figure |
 | `t_atomic_writes` | Concurrent writers do not lose changes |
