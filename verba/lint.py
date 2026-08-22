@@ -517,10 +517,13 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
             (project.root / "review" / "picture-match.json").read_text(encoding="utf-8"))
     except Exception:
         matches = {}
+    # {section id: {filename ruled not to be of that section}}
+    misfits: dict[str, set] = {}
     for key, verdict in sorted(matches.items()):
         if verdict.get("fits", True):
             continue
         sid, _, fname = key.partition("|")
+        misfits.setdefault(sid, set()).add(fname)
         sec = project.sections.get(sid)
         if sec is None or fname not in (sec.screenshots() or []):
             continue                       # the figure has since been changed
@@ -557,7 +560,20 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         # new one.
         if (registry.get(name) or {}).get("retired"):
             continue
-        add(Finding("ASSET-05", INFO, "", f"asset is not referenced anywhere: {name}"))
+        # A picture nothing shows and no screen produces is inventory, not a
+        # finding. Nothing the loop can do reaches it: no crawl replaces it,
+        # no step adopts it, and the only remaining move is a person deciding
+        # to write a section around it. Reporting it anyway put eighteen
+        # permanently unclearable items in front of somebody who had asked
+        # five times why the list never emptied, and buried the two items that
+        # were real. The Images page lists every unused picture, which is where
+        # an inventory belongs.
+        if name not in shots:
+            continue
+        add(Finding("ASSET-05", INFO, "",
+                    f"asset is not referenced anywhere: {name}",
+                    "A screen produces this file, so either a section should "
+                    "show it or the screen should stop capturing it."))
 
     # A section whose screen captures under a different filename than the section
     # references will crawl happily and change nothing: the new image lands
@@ -575,6 +591,15 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         used = set(sec.screenshots())
         for screen_id in sec.screens:
             shot = shot_of.get(screen_id)
+            # A capture ruled not to be a picture of this section is a capture
+            # this section is right not to use. The rule's premise is that a
+            # recapture ought to reach the document; when somebody has looked
+            # and said it shows a different part of the product, it ought not,
+            # and reporting it asks for a change that would be reverted by the
+            # rule below. Two steps then take turns undoing each other forever,
+            # which is exactly what happened.
+            if shot and shot in misfits.get(sec.id, ()):
+                continue
             if shot and used and shot not in used:
                 add(Finding("ASSET-07", WARN, f"{node.number} {sec.id}",
                             f"screen {screen_id} captures to {shot}, which this "
@@ -594,6 +619,23 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
             retired = any((rec or {}).get("retired", {}).get("from") == sec.id
                           for rec in (getattr(project.assets, "registry", {}) or {}).values())
             if retired:
+                continue
+            # Nor when every picture those screens produce is already shown by
+            # another section. Capturing again changes nothing, and adopting
+            # the picture would put the same figure in two sections, which is
+            # an error. A rule whose only available fix is a worse finding is
+            # not asking for work, it is asking to be ignored, and a person who
+            # has been told five times that the list never empties is right.
+            #
+            # A sub-section documenting one panel of a screen its parent shows
+            # is the ordinary case, not a defect. It wants a crop of its own,
+            # which is a person defining a screen, or it wants no figure.
+            produced = {shot_of.get(sid) for sid in sec.screens}
+            produced.discard(None)
+            if produced and all(
+                    any(p in (o.screenshots() or []) for o in project.sections.values()
+                        if o.id != sec.id)
+                    for p in produced):
                 continue
             add(Finding("ASSET-06", INFO, f"{node.number} {sec.id}",
                         "section maps to a screen but shows no screenshot"))

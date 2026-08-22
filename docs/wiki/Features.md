@@ -80,7 +80,8 @@ properly.
 | **Twelve steps** | Notes, strays, gaps, writing, drift, pictures, unchecked pictures, evidence review, picture match, the decider, polish |
 | **Measure and revert** | Every step applied, the rules counted again, anything that made it worse put straight back |
 | **No rewrite may drop a figure** | Counting errors is not enough: a rewrite that quietly loses pictures looks like an improvement to a counter |
-| **The decider** | A closed menu of three moves: repoint a figure, retire one, or say plainly that this is yours |
+| **The decider** | A closed menu: repoint a figure, retire one, stop the crawl making a picture nothing shows, accept, or say plainly that this is yours |
+| **Rules report only actionable work** | A finding no step can clear is not put in front of a person. Unused legacy pictures are inventory, listed under Images |
 | **Retirement is honoured** | Marked on the asset, so the sweep cannot re-offer what the decider removed |
 | **Reports only what you own** | If the loop works, its own debris is not your problem |
 | **Safe unattended** | `verba capture && verba fix && verba build --pdf` on a schedule |

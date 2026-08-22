@@ -657,6 +657,12 @@ WHY: one sentence
 
 or
 
+ACTION: stop_capturing
+FILE: the-file.png
+WHY: one sentence
+
+or
+
 ACTION: none
 WHY: one sentence saying what a person has to decide and why you cannot
 
@@ -675,7 +681,16 @@ is better documentation than a section with none.
 accept records that the picture is fine after all. Use it only for a false
 alarm, never to make a finding go away.
 
-none is for a decision that genuinely belongs to a person.
+stop_capturing takes a picture out of the crawl. Use it for a picture the crawl
+produces that no section shows and none should: a crop of an icon, a detail
+photographed for a section that was rewritten, a leftover from a screen
+definition somebody has moved on from. The file stays; the crawl stops making
+it again, and the document is not touched. Do not use it on a picture a section
+ought to show. That is repoint.
+
+none is for a decision that genuinely belongs to a person. Before you choose it,
+check that none of the four above fit: a finding handed to a person who then has
+no more information than you did is a finding nobody will ever close.
 
 Rules you are held to:
 
@@ -818,7 +833,8 @@ def read_decision(text: str) -> dict:
         key = key.strip().lower()
         if key in out:
             out[key] = value.strip()
-    if out["action"] not in ("drop_figure", "repoint", "accept", "none"):
+    if out["action"] not in ("drop_figure", "repoint", "accept",
+                            "stop_capturing", "none"):
         out["action"] = "none"
     return out
 

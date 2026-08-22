@@ -956,16 +956,28 @@ function jobsPanel() {
    finding here carries what would clear it and the button that does it. */
 async function drawFindings(m) {
   m.innerHTML = '';
-  m.append(el('h2', 'page', 'To fix'));
 
   let d;
   try { d = await api('/api/findings'); }
-  catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
+  catch (e) {
+    m.append(el('h2', 'page', 'Check'));
+    m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`));
+    return;
+  }
 
-  m.append(el('div', 'muted',
-    d.errors
-      ? `${d.errors} thing(s) block a build, ${d.findings.length - d.errors} worth a look.`
-      : `Nothing blocks a build. ${d.findings.length} thing(s) worth a look.`));
+  // A heading is a claim. "To fix" over an empty list says there is work here
+  // and then shows none of it, and "0 thing(s) worth a look" underneath is the
+  // page arguing with its own title. When the document is clean this page says
+  // so, and the page is named for what it does rather than for what it hopes
+  // to find.
+  m.append(el('h2', 'page', d.findings.length ? 'To fix' : 'Check'));
+
+  if (d.findings.length) {
+    m.append(el('div', 'muted',
+      d.errors
+        ? `${d.errors} thing(s) block a build, ${d.findings.length - d.errors} worth a look.`
+        : `Nothing blocks a build. ${d.findings.length} thing(s) worth a look.`));
+  }
 
   // Offered above the list, not after it: the point is that most of this does
   // not need reading one item at a time.
@@ -980,9 +992,9 @@ async function drawFindings(m) {
   }
 
   if (!d.findings.length) {
-    await drawSurvey(m);
     m.append(el('div', 'panel accent',
-      '<div class="empty">The document is clean.</div>'));
+      '<div class="empty">The document breaks no rules. Nothing is outstanding.</div>'));
+    await drawSurvey(m);
     await drawNotes(m);
     return;
   }

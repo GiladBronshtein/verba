@@ -81,10 +81,14 @@ The last step handles what nothing else could. It has exactly three moves:
 |---|---|
 | Repoint a figure | The right picture exists under another name |
 | Retire a figure | The picture cannot be published and no crawl can replace it |
+| Stop capturing | The crawl produces a picture no section shows and none should |
+| Accept | A false alarm |
 | Hand it back | Anything else |
 
-Nothing else is available to it, so it cannot invent a fourth option under
-pressure. A retirement is recorded on the asset:
+Nothing else is available to it, so it cannot invent an option under pressure.
+The menu is also the thing to check when a finding will not clear: a decider
+with no move that fits says "left for a person" every round forever, which is
+how four unused image crops survived five rounds of being fixed. A retirement is recorded on the asset:
 
 ```json
 "retired": {"when": "2026-08-22T17:52", "from": "dashboard.overview", "why": "..."}
@@ -93,6 +97,26 @@ pressure. A retirement is recorded on the asset:
 The sweep reads that marker and will not re offer the same figure to the same
 section. Before it did, a decider removal and a sweep re addition fought each
 other across four rounds of History.
+
+## A rule may only report work that can be done
+
+The loop can settle what a rule asks for. It cannot settle a rule that asks for
+something impossible, and three of those kept a list permanently full:
+
+| Rule | Was reporting | Why nothing could clear it |
+|---|---|---|
+| `ASSET-05` | Every unreferenced picture | Most were legacy imports no screen produces. No crawl replaces them, no step adopts them |
+| `ASSET-06` | Any section with a screen and no figure | When the screen's only picture is already shown elsewhere, adopting it makes a duplicate, which is an error |
+| `ASSET-07` | Any screen capturing to a name its section does not use | Even when the picture check had already ruled that capture is of a different screen |
+
+The last one was worse than noise. The decider repointed the section at the
+capture to clear `ASSET-07`; the picture check looked, saw a different screen,
+and took it out again; `ASSET-07` returned. The error count was identical after
+every round, so measure-and-revert saw a loop making no changes rather than two
+steps undoing each other.
+
+All three now report only what something can act on. Anything else belongs in
+Images, which is an inventory, not a queue.
 
 ## Why you should not see a "to fix" list
 

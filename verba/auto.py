@@ -186,6 +186,32 @@ def _drop_figure(text: str, filename: str) -> str:
     return joined
 
 
+def _once(items: list) -> list:
+    """The same thing, handed back once.
+
+    Every round re-lints and re-decides, so a finding a person owns is added
+    again on each pass. Four findings over two rounds were reported as nine
+    things to decide, which reads as the list growing while the loop claims to
+    be shortening it.
+    """
+    seen, out = set(), []
+    for it in items:
+        key = str(it.get("what", ""))[:160]
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
+
+
+def _worth_deciding(finding) -> bool:
+    """An INFO the system could actually act on, rather than merely mention."""
+    if finding.level != "info":
+        return False
+    from .lint import remedy
+    return (remedy(finding.rule) or {}).get("action") not in (None, "", "none", "open")
+
+
 @dataclass
 class Auto:
     root: Path
@@ -786,6 +812,97 @@ class Auto:
         self._matched = already
         return f"{checked} picture(s) checked against their section" if checked else ""
 
+    def _stop_capturing(self, name: str, why: str, emit) -> bool:
+        """Take one named crop out of the screen registry.
+
+        A picture the crawl makes that nothing shows is work being done for
+        nobody, and it reports itself as unreferenced after every single run.
+        There was no move for it: the decider could drop a figure from a
+        section or swap one for another, and this picture is in no section, so
+        every round ended in "left for a person" and the person was handed a
+        crawl setting they had no way to recognise as one.
+
+        Edited as text, one entry at a time. Loading this file and dumping it
+        back is four lines and loses every comment in it, including the block
+        at the top explaining that credentials come from the environment. A
+        registry nobody can read any more is a worse outcome than an unused
+        crop, and the first version of this did exactly that.
+
+        Only named elements. A screen's main photograph is what the screen is
+        for, and a screen that photographs nothing should be deleted by a
+        person, not quietly emptied by this.
+        """
+        import yaml
+
+        from .history import History
+        path = self.root / "content" / "screens.yaml"
+        try:
+            before = path.read_text(encoding="utf-8")
+            data = yaml.safe_load(before) or {}
+        except Exception as e:
+            emit(f"      could not read the screen registry: {e}")
+            return False
+
+        owner = ""
+        for screen in data.get("screens", []) or []:
+            if any((e or {}).get("name") == name
+                   for e in (screen.get("elements") or [])):
+                owner = screen.get("id", "")
+                break
+        if not owner:
+            emit(f"      {name} is not a named crop, so it is not the crawl's "
+                 f"to stop")
+            return False
+
+        lines = before.splitlines(keepends=True)
+        start = next((i for i, ln in enumerate(lines) if name in ln), None)
+        if start is None:
+            return False
+        # A list item is its own dash line plus every deeper line under it.
+        while start > 0 and not lines[start].lstrip().startswith("-"):
+            start -= 1
+        indent = len(lines[start]) - len(lines[start].lstrip())
+        end = start + 1
+        while end < len(lines):
+            stripped = lines[end].strip()
+            if stripped and (len(lines[end]) - len(lines[end].lstrip())) <= indent:
+                break
+            end += 1
+        after = "".join(lines[:start] + lines[end:])
+
+        try:
+            checked = yaml.safe_load(after) or {}
+            still = [e.get("name") for s in (checked.get("screens") or [])
+                     for e in (s.get("elements") or [])]
+        except Exception as e:
+            emit(f"      not touching the registry: the edit would not parse ({e})")
+            return False
+        if name in still or len(checked.get("screens") or []) != len(
+                data.get("screens") or []):
+            emit("      not touching the registry: the edit removed more than "
+                 "the one entry")
+            return False
+
+        from .atomic import write_text
+        write_text(path, after)
+        History(self.root).record(
+            owner, path, before, after, actor="auto", action="decide",
+            note=f"{owner} no longer photographs {name}: {why[:120]}")
+        emit(f"      {owner} no longer photographs {name}")
+        emit(f"        because {why[:100]}")
+        return True
+
+    def _picture_fits(self, section_id: str, name: str) -> bool:
+        """Has this picture already been ruled not to be of this section?"""
+        import json
+        try:
+            verdicts = json.loads(
+                (self.root / MATCHES).read_text(encoding="utf-8"))
+        except Exception:
+            return True
+        v = verdicts.get(f"{section_id}|{name}")
+        return True if v is None else bool(v.get("fits", True))
+
     def _picture_choices(self, proj) -> list[dict]:
         """Pictures already photographed, and what each screen is called.
 
@@ -840,7 +957,13 @@ class Auto:
         from .lint import lint
 
         proj = self._project()
-        left = [f for f in lint(proj) if f.level in ("error", "warning")]
+        # Not just errors and warnings. A finding's level says how badly it
+        # would hurt to publish, not whether anything can be done about it, and
+        # reading it as the second thing made every INFO permanently invisible
+        # to the one step whose whole job is settling what nothing else could.
+        # They accumulated in front of a person who could only look at them.
+        left = [f for f in lint(proj)
+                if f.level in ("error", "warning") or _worth_deciding(f)]
         if not left:
             return ""
 
@@ -882,6 +1005,13 @@ class Auto:
                     "do": "Open the section and decide."})
                 continue
 
+            if d["action"] == "stop_capturing":
+                took = self._stop_capturing(d["file"], d["why"], emit)
+                if took:
+                    done += 1
+                    proj = self._project()
+                continue
+
             if d["action"] == "accept":
                 name = d["file"]
                 if proj.assets.exists(name):
@@ -908,6 +1038,16 @@ class Auto:
             if d["action"] == "repoint":
                 if not d["to"] or not proj.assets.exists(d["to"]):
                     emit(f"      cannot repoint to {d['to']!r}: no such picture")
+                    continue
+                # Somebody has already looked at this picture and said it is of
+                # a different part of the product. Pointing the section at it
+                # would be undone by the step that looks, which would hand it
+                # back here, which would point at it again. Two steps taking
+                # turns is not a loop making progress, and the rule count never
+                # moves, so nothing catches it.
+                if not self._picture_fits(d["section"], d["to"]):
+                    emit(f"      will not point {d['section']} at {d['to']}: "
+                         f"it has been looked at and is of something else")
                     continue
                 after = before.replace(d["file"], d["to"])
                 if after != before:
@@ -1306,7 +1446,7 @@ class Auto:
             "errors_before": started_with,
             "errors_after": left,
             "steps": [s.to_dict() for s in self.steps],
-            "for_you": self.for_you,
+            "for_you": _once(self.for_you),
         }
         path = self.root / "review" / "auto.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -1329,5 +1469,5 @@ class Auto:
         if started_with or left:
             emit(f"rule findings: {started_with} to {left}")
         if self.for_you:
-            emit(f"{len(self.for_you)} thing(s) still yours to decide")
+            emit(f"{len(_once(self.for_you))} thing(s) still yours to decide")
         return out

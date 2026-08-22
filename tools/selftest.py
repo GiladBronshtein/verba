@@ -10,6 +10,7 @@ that it works on a product it has never seen.
 """
 from __future__ import annotations
 
+import base64
 import shutil
 import sys
 import tempfile
@@ -56,6 +57,11 @@ def eq(got, want, what=""):
 
 _FIXTURE: Path | None = None
 
+
+# The smallest valid PNG. Several rules only care that a file is there and
+# readable, not what is in it.
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
 def fixture() -> Path:
     """A scaffolded project, made once and reused."""
@@ -896,6 +902,100 @@ def t_handoff_waits_for_the_person():
             f"read {len(cols)} columns, saved the session")
 
 
+@check("a finding nothing can act on is not put in front of a person")
+def t_only_actionable_work_is_reported():
+    """Three ways the To fix list stayed full no matter how often it was run.
+
+    All three were invisible to the rule count, which is what the loop measures
+    itself by, so every round reported success while the list did not move.
+    """
+    import json
+
+    from verba.auto import _worth_deciding
+    from verba.lint import INFO, Finding, lint
+    from verba.project import Project
+
+    root = fresh()
+
+    # 1. The decider only ever looked at errors and warnings, so every INFO was
+    #    structurally unreachable by the one step whose job is settling things.
+    ok(_worth_deciding(Finding("ASSET-06", INFO, "s", "x")),
+       "an INFO the system can act on is still invisible to the decider")
+    ok(not _worth_deciding(Finding("META-01", INFO, "s", "x")),
+       "an INFO only a person can settle is being sent to the decider")
+
+    # 2. An unreferenced picture that no screen produces cannot be reached by
+    #    any step: no crawl replaces it, nothing adopts it. Reporting it is
+    #    asking for work that cannot be done.
+    assets = root / "content" / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    (assets / "orphan-from-an-old-import.png").write_bytes(PNG)
+    reg = json.loads((assets / "registry.json").read_text())
+    reg["orphan-from-an-old-import.png"] = {"legacy_name": "old_doc_fig_12.png"}
+    (assets / "registry.json").write_text(json.dumps(reg))
+    stray = [f for f in lint(Project.load(root))
+             if f.rule == "ASSET-05" and "orphan" in f.message]
+    eq(stray, [], "a picture no screen produces was reported as work: ")
+
+    # 3. ASSET-07 asks a section to adopt its screen's capture. ASSET-12 rules
+    #    that capture is of something else. Each is right; together they took
+    #    turns forever, and the rule count never moved so nothing noticed.
+    proj = Project.load(root)
+    sec = next(s for s in proj.sections.values() if s.screens)
+    screen = sec.screens[0]
+    import yaml
+    reg_path = root / "content" / "screens.yaml"
+    data = yaml.safe_load(reg_path.read_text())
+    shot = next(s["shot"] for s in data["screens"] if s["id"] == screen)
+
+    body = sec.path.read_text(encoding="utf-8")
+    other = "a-different-picture.png"
+    (assets / other).write_bytes(PNG)
+    sec.path.write_text(body + f"\n\n![Something else]({other})\n", encoding="utf-8")
+
+    def asset07():
+        return [f for f in lint(Project.load(root)) if f.rule == "ASSET-07"]
+
+    ok(asset07(), "ASSET-07 did not fire, so this test proves nothing")
+
+    (root / "review").mkdir(exist_ok=True)
+    (root / "review" / "picture-match.json").write_text(json.dumps({
+        f"{sec.id}|{shot}": {"fits": False, "what": "shows a different screen",
+                             "when": "2026-08-23"}}), encoding="utf-8")
+    eq(asset07(), [],
+       "ASSET-07 still asks for a picture already ruled to be of something else: ")
+    # 4. Removing a crop from the registry must not take the registry's prose
+    #    with it. Loading and dumping the YAML is four lines and loses every
+    #    comment in the file, the block about credentials included.
+    import yaml as _yaml
+
+    from verba.auto import Auto
+    reg_text = reg_path.read_text(encoding="utf-8")
+    comments = [ln for ln in reg_text.splitlines() if ln.strip().startswith("#")]
+    ok(comments, "the scaffolded registry has no prose, so this proves nothing")
+    data = _yaml.safe_load(reg_text)
+    target = data["screens"][0]
+    target.setdefault("elements", []).append(
+        {"name": "icon-nothing-shows.png", "selector": ".badge"})
+    reg_path.write_text(_yaml.safe_dump(data, sort_keys=False)
+                        + "\n" + "\n".join(comments), encoding="utf-8")
+    kept = [ln for ln in reg_path.read_text().splitlines()
+            if ln.strip().startswith("#")]
+
+    ok(Auto(root)._stop_capturing("icon-nothing-shows.png", "nothing shows it",
+                                  lambda *a: None),
+       "the loop could not take an unused crop out of the registry")
+    now = reg_path.read_text(encoding="utf-8")
+    eq([ln for ln in now.splitlines() if ln.strip().startswith("#")], kept,
+       "taking a crop out of the registry rewrote its prose: ")
+    after = _yaml.safe_load(now)
+    eq(len(after["screens"]), len(data["screens"]), "screens were lost: ")
+    ok("icon-nothing-shows.png" not in now, "the crop is still in the registry")
+
+    return ("unreachable work is not reported, the two rules no longer fight, "
+            "and the registry keeps its prose")
+
+
 @check("the content model round-trips")
 def t_model():
     from verba.model import Section, parse_section
@@ -917,6 +1017,7 @@ def main() -> int:
              t_rewrites_keep_figures, t_no_tug_of_war, t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
+             t_only_actionable_work_is_reported,
              t_model]
     for t in tests:
         t()

@@ -83,6 +83,14 @@ built in set entirely. See [The writer](The-writer).
 | `STYLE-06` | ERROR | The text names one account's value where it should name the feature. The reader is looking at a different account. | Rewrite to house style | the system |
 ## The ones worth understanding
 
+**A rule fires only when something can act on it.** `ASSET-05` reports an
+unreferenced picture only when a screen produces it, because a legacy import no
+crawl can reach is inventory rather than work. `ASSET-06` stays quiet when the
+section's screen produces only pictures another section already shows, because
+adopting one would make a duplicate. `ASSET-07` stays quiet when the picture
+check has ruled that capture is of a different screen. Each of those used to
+report work whose only available fix was a worse finding.
+
 **`ASSET-03`, two sections showing the same picture.** An error rather than a
 warning, because it means one of the two sections is illustrated by a screen it
 does not describe, and a reader trusts a picture more than a paragraph. Which of
