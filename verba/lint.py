@@ -507,7 +507,7 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
     for name in sorted(used):
         rec = registry.get(name) or {}
         src = str(rec.get("source", ""))
-        if "/capture/" in src or rec.get("masked"):
+        if "/capture/" in src or rec.get("masked") or rec.get("checked_by"):
             continue
         where = ("lifted from " + str(rec.get("legacy_name"))
                  if rec.get("legacy_name") else

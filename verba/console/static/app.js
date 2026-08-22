@@ -1450,6 +1450,69 @@ async function drawMasking(m) {
   }
   m.append(auto);
 
+  // The only part of this a person has to do, and the only part they can.
+  if ((d.unchecked || []).length) {
+    const u = el('div', 'panel warn-edge');
+    u.append(el('h3', null, `${d.unchecked.length} picture(s) nobody has checked`));
+    u.append(el('div', 'muted',
+      'These did not come from a crawl, so the masking rules never ran on them. ' +
+      'That does not mean they are wrong, it means nobody has looked. Look at ' +
+      'each one: if it shows no real customer name, say so and it stops being ' +
+      'reported.'));
+
+    const bulk = el('div', 'row'); bulk.style.margin = '12px 0';
+    const allok = el('button', 'act', icon('check') + 'They are all fine');
+    allok.onclick = async () => {
+      if (!await modal({
+        title: `Mark ${d.unchecked.length} pictures as checked?`,
+        body: '<p>This records that <b>you</b> looked at them and saw no real ' +
+              'customer names. It does not claim anything was masked, because ' +
+              'nothing was. Only do this if you have actually looked.</p>',
+        confirmLabel: 'I have looked, they are fine' })) return;
+      for (const pic of d.unchecked) {
+        await api('/api/images/checked', { method: 'POST', json: { name: pic.name } });
+      }
+      toast(`${d.unchecked.length} pictures marked as checked`);
+      await refresh();
+      drawMasking(holder());
+    };
+    bulk.append(allok);
+    u.append(bulk);
+
+    const grid = el('div', 'checkgrid');
+    d.unchecked.forEach(pic => {
+      const card = el('div', 'checkcard');
+      const img = el('img');
+      img.src = pic.url;
+      img.alt = `Screenshot ${pic.name}`;
+      img.loading = 'lazy';
+      img.onclick = () => window.open(pic.url, '_blank');
+      img.title = 'Open it full size';
+      card.append(img);
+      card.append(el('div', 'cname', esc(pic.name)));
+      card.append(el('div', 'cwhere', pic.section
+        ? `Shown in ${esc(pic.section)}` : ''));
+      const row = el('div', 'row');
+      const fine = el('button', 'mini go', 'No real names, it is fine');
+      fine.onclick = async () => {
+        await api('/api/images/checked', { method: 'POST', json: { name: pic.name } });
+        toast(`${pic.name} checked`);
+        await refresh();
+        drawMasking(holder());
+      };
+      row.append(fine);
+      if (pic.reachable) {
+        const shoot = el('button', 'mini', 'Photograph it again');
+        shoot.onclick = () => runCapture(null);
+        row.append(shoot);
+      }
+      card.append(row);
+      grid.append(card);
+    });
+    u.append(grid);
+    m.append(u);
+  }
+
   if (d.mapping.length) {
     const p = el('div', 'panel'); p.style.padding = '0';
     const tb = el('table', null,

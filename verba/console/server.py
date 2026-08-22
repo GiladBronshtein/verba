@@ -351,6 +351,20 @@ class ConsoleState:
         name = f"capture {section_id}" if section_id else "capture the live system"
         return self.jobs.start(name, run, detail=", ".join(screen_ids or ["all screens"]))
 
+    def screens_for_section(self, section_id: str) -> list[str]:
+        """Exactly the screens one section depends on.
+
+        `capture_now(None, sid)` reads as "capture this section" and is not:
+        the first argument is the screen list and None there means every screen
+        in the registry. Recapturing one section therefore crawled the entire
+        product, and a run that wanted two sections crawled it twice.
+        """
+        _, screens = self.screens()
+        sec = self.reload().sections.get(section_id)
+        want = list(getattr(sec, "screens", []) or []) if sec else []
+        want += [s.id for s in screens if section_id in (getattr(s, "sections", []) or [])]
+        return sorted(set(want))
+
     def capture_now(self, screen_ids: list[str] | None, section_id: str | None = None,
                     mask: bool = True, replay_steps: bool = False, heal: bool = True,
                     sweep: bool = True, log=None):
@@ -828,6 +842,9 @@ class Handler(BaseHTTPRequestHandler):
                     "patterns": [dict(x) for x in (mk.patterns or [])],
                     "literals": [dict(x) for x in (mk.literals or [])],
                     "mapping": mk.table(),
+                    # Pictures nobody has looked at, with a link to each, so the
+                    # only person who can settle them can actually see them.
+                    "unchecked": _unchecked_pictures(st),
                 })
 
             if path == "/api/screens":
@@ -1200,6 +1217,34 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"ok": True,
                                   "message": f"set in {t.face('document').label}"})
 
+            if path == "/api/images/checked":
+                # A picture no crawl can reach is not a defect, it is a picture
+                # nobody has looked at. A person can look at it: that is the
+                # whole finding. Recorded as a person's verdict rather than as
+                # proof of masking, because those are different claims and only
+                # one of them is true here.
+                d = data or {}
+                name = str(d.get("name") or "").strip()
+                proj = st.reload()
+                if not name or not proj.assets.exists(name):
+                    return self.fail(f"no picture called {name!r}")
+                if d.get("undo"):
+                    proj.assets.registry.get(name, {}).pop("checked_by", None)
+                    proj.assets.save()
+                    st.reload()
+                    return self.json({"ok": True,
+                                      "message": f"{name} is unchecked again"})
+                entry = proj.assets.registry.setdefault(name, {})
+                entry["checked_by"] = {
+                    "who": "a person at this console",
+                    "when": datetime.now().strftime("%Y-%m-%d"),
+                    "note": str(d.get("note") or "").strip(),
+                }
+                proj.assets.save()
+                st.reload()
+                return self.json({"ok": True,
+                                  "message": f"{name} marked as checked"})
+
             if path == "/api/masking/literal":
                 # The one rule a person adds by hand: "this exact name must
                 # never appear, put that instead". Columns and patterns need a
@@ -1404,7 +1449,8 @@ class Handler(BaseHTTPRequestHandler):
                         st.root, st.reload, st.history, st.knowledge, log=log,
                         allow_crawl=bool((data or {}).get("crawl", True)),
                         capture=lambda sid, lg: st.capture_now(
-                            None, sid, mask=True, sweep=False, log=lg))
+                            st.screens_for_section(sid) or None, sid,
+                            mask=True, sweep=False, log=lg))
 
                 job = st.jobs.start("fix what can be fixed", _fix,
                                     detail="apply, tidy, re-check")
@@ -1427,7 +1473,8 @@ class Handler(BaseHTTPRequestHandler):
                         allow_crawl=bool(d.get("crawl", True)),
                         full=bool(d.get("crawl", True)),
                         capture=lambda sid, lg: st.capture_now(
-                            None, sid, mask=True, sweep=False, log=lg),
+                            st.screens_for_section(sid) or None, sid,
+                            mask=True, sweep=False, log=lg),
                         capture_all=lambda lg: st.capture_now(
                             None, None, mask=True, sweep=True, log=lg))
 
@@ -1876,6 +1923,24 @@ def _all_images(root: Path) -> dict:
             })
     return {"shipping": shipping, "pending": pending,
             "orphans": len([a for a in shipping if a["orphan"]])}
+
+
+def _unchecked_pictures(st) -> list[dict]:
+    proj = st.reload()
+    reg = getattr(proj.assets, "registry", {}) or {}
+    out = []
+    for f in lint(proj):
+        if f.rule not in ("ASSET-10", "ASSET-11"):
+            continue
+        name = f.message.split(":", 1)[-1].strip()
+        out.append({
+            "name": name,
+            "section": f.section or "",
+            "reachable": f.rule == "ASSET-10",
+            "where": (reg.get(name) or {}).get("legacy_name", ""),
+            "url": f"/files/content/assets/screenshots/{name}",
+        })
+    return out
 
 
 def serve(root: Path, port: int = 8800, profile: str | None = None,
