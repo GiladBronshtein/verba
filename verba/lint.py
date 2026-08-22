@@ -182,6 +182,11 @@ REMEDIES = {
     # and the place to do it is the section that ships the picture. A finding
     # with nothing to press is a complaint, which is a rule this project holds
     # itself to and I had just broken.
+    "ASSET-12":   ("Open the section that shows it", "open",
+                   "The picture is of a different part of the product from the "
+                   "one this section describes. Either point the section at a "
+                   "screen that shows what it is about, or take the figure out "
+                   "and let the text stand."),
     "ASSET-11":   ("Open the section that shows it", "open",
                    "Nothing has checked this picture for real names, and no "
                    "screen in the registry produces it, so photographing the "
@@ -503,6 +508,25 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                     shots.add(elem["name"])
     except Exception:
         pass
+
+    # A picture of something other than what the section describes. Recorded by
+    # the loop when it looked, so this costs nothing to check.
+    try:
+        import json
+        matches = json.loads(
+            (project.root / "review" / "picture-match.json").read_text(encoding="utf-8"))
+    except Exception:
+        matches = {}
+    for key, verdict in sorted(matches.items()):
+        if verdict.get("fits", True):
+            continue
+        sid, _, fname = key.partition("|")
+        sec = project.sections.get(sid)
+        if sec is None or fname not in (sec.screenshots() or []):
+            continue                       # the figure has since been changed
+        add(Finding("ASSET-12", WARN, sid,
+                    f"picture is not of what this section describes: {fname}",
+                    verdict.get("what", "")))
 
     for name in sorted(used):
         rec = registry.get(name) or {}

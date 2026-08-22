@@ -90,6 +90,22 @@ class Step:
         return {**self.__dict__, "better": self.better}
 
 
+MATCHES = "review/picture-match.json"
+
+
+def _load_matches(root) -> dict:
+    import json
+    try:
+        return json.loads((Path(root) / MATCHES).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_matches(root, data: dict):
+    from .atomic import write_json
+    write_json(Path(root) / MATCHES, data)
+
+
 def _drop_figure(text: str, filename: str) -> str:
     """Remove one figure line, and the blank line it leaves behind."""
     out, skipped = [], False
@@ -562,6 +578,7 @@ class Auto:
 
         proj = self._project()
         already = self._matched if hasattr(self, "_matched") else set()
+        verdicts = _load_matches(self.root)
         checked = 0
         for node in proj.nodes:
             sec = node.section
@@ -587,16 +604,39 @@ class Auto:
                     return ""
                 fits, what = assist.read_match(res.output)
                 checked += 1
+                # Written down rather than only reported. A verdict that lives
+                # in a log is a thing somebody has to read; a verdict in the
+                # store is a finding, and a finding is something the loop can
+                # settle on its own.
+                verdicts[f"{sec.id}|{name}"] = {
+                    "fits": fits, "what": what,
+                    "when": datetime.now().strftime("%Y-%m-%d"),
+                }
                 if not fits:
                     emit(f"      {node.number} {sec.title}: the picture shows {what}")
-                    self.for_you.append({
-                        "what": f"{node.number} {sec.title} shows a picture of "
-                                f"something else",
-                        "why": f"{name}: {what}",
-                        "do": "Point the section at the right screen in "
-                              "content/screens.yaml, or change the section."})
+        _save_matches(self.root, verdicts)
         self._matched = already
         return f"{checked} picture(s) checked against their section" if checked else ""
+
+    def _picture_choices(self, proj) -> list[dict]:
+        """Pictures already photographed, and what each screen is called.
+
+        Offered so a wrong figure can be swapped for a right one rather than
+        only removed. A section with the right picture is better documentation
+        than a section with none, and the alternative was already on disk.
+        """
+        try:
+            from .capture import load_screens
+            _, screens = load_screens(self.root / "content" / "screens.yaml")
+        except Exception:
+            return []
+        out = []
+        for s in screens:
+            shot = getattr(s, "shot", "")
+            if shot and proj.assets.exists(shot):
+                out.append({"file": shot,
+                            "shows": getattr(s, "title", "") or s.id})
+        return out[:40]
 
     def _settle_the_rest(self, emit) -> str:
         """Decide the findings no mechanical step could clear.
@@ -646,7 +686,8 @@ class Auto:
 
             res = assist.decide(
                 {"rule": f.rule, "message": f.message, "detail": f.detail or ""},
-                payload, edition=proj.profile.name)
+                payload, edition=proj.profile.name,
+                candidates=self._picture_choices(proj))
             if not res.ok:
                 self._describe_blocked = (res.error or "")[:120]
                 emit(f"      could not decide {f.rule}: {res.error}")
@@ -677,6 +718,23 @@ class Auto:
             if sec is None or not d["file"]:
                 continue
             before = sec.path.read_text(encoding="utf-8")
+            if d["action"] == "repoint":
+                if not d["to"] or not proj.assets.exists(d["to"]):
+                    emit(f"      cannot repoint to {d['to']!r}: no such picture")
+                    continue
+                after = before.replace(d["file"], d["to"])
+                if after != before:
+                    sec.path.write_text(after, encoding="utf-8")
+                    History(self.root).record(
+                        sec.id, sec.path, before, after, actor="auto",
+                        action="decide",
+                        note=f"{sec.id} now shows {d['to']} instead of "
+                             f"{d['file']}: {d['why'][:110]}")
+                    emit(f"      {sec.id} now shows {d['to']}")
+                    emit(f"        because {d['why'][:100]}")
+                    done += 1
+                    proj = self._project()
+                continue
             after = _drop_figure(before, d["file"])
             if after == before:
                 continue

@@ -612,6 +612,14 @@ WHY: one sentence
 
 or
 
+ACTION: repoint
+SECTION: the.section.id
+FILE: the-file-to-replace.png
+TO: a-file-from-the-available-list.png
+WHY: one sentence
+
+or
+
 ACTION: accept
 FILE: the-file.png
 WHY: one sentence
@@ -627,6 +635,11 @@ drop_figure removes one figure from one section. The text stays. Use it when a
 figure does not illustrate the section it sits in, when two sections show the
 same picture and only one of them is about it, or when a picture cannot be
 published and cannot be replaced.
+
+repoint swaps one figure for a different picture that is already captured. Use
+it when the section should have a figure and one of the available pictures is
+of the right thing. Prefer this to dropping: a section with the right picture
+is better documentation than a section with none.
 
 accept records that the picture is fine after all. Use it only for a false
 alarm, never to make a finding go away.
@@ -738,6 +751,7 @@ def read_match(text: str) -> tuple[bool, str]:
 
 
 def decide(finding: dict, sections: list[dict], edition: str = "",
+           candidates: list[dict] | None = None,
            timeout: int = 90) -> AssistResult:
     """Ask for a decision on a finding nothing mechanical could settle."""
     lines = [f"Edition being built: {edition or 'the default one'}", "",
@@ -752,6 +766,12 @@ def decide(finding: dict, sections: list[dict], edition: str = "",
             lines.append("    text: " + body[:400].replace("\n", " "))
         lines.append("")
 
+    if candidates:
+        lines.append("Pictures already captured that you may repoint to:")
+        for c in candidates:
+            lines.append(f"    {c['file']}  —  {c.get('shows', '')}")
+        lines.append("")
+
     ok_, why = available()
     if not ok_:
         return AssistResult(False, error=why)
@@ -759,7 +779,7 @@ def decide(finding: dict, sections: list[dict], edition: str = "",
 
 
 def read_decision(text: str) -> dict:
-    out = {"action": "none", "section": "", "file": "", "why": ""}
+    out = {"action": "none", "section": "", "file": "", "to": "", "why": ""}
     for line in (text or "").splitlines():
         if ":" not in line:
             continue
@@ -767,7 +787,7 @@ def read_decision(text: str) -> dict:
         key = key.strip().lower()
         if key in out:
             out[key] = value.strip()
-    if out["action"] not in ("drop_figure", "accept", "none"):
+    if out["action"] not in ("drop_figure", "repoint", "accept", "none"):
         out["action"] = "none"
     return out
 
