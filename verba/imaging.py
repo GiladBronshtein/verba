@@ -84,9 +84,9 @@ def crop_by_rect(img: Image.Image, rect) -> Image.Image:
     Matches Word's srcRect semantics, so a crop authored in Word survives the
     round trip and can be re-cut against a freshly captured screenshot.
     """
-    l, t, r, b = [float(x) / 100.0 for x in rect]
+    lum, t, r, b = [float(x) / 100.0 for x in rect]
     w, h = img.size
-    box = (int(round(w * l)), int(round(h * t)),
+    box = (int(round(w * lum)), int(round(h * t)),
            int(round(w * (1 - r))), int(round(h * (1 - b))))
     if box[2] <= box[0] or box[3] <= box[1]:
         return img

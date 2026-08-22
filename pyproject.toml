@@ -54,3 +54,12 @@ verba = ["console/static/*"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+# E702 is a semicolon joining two statements. Used here only for pairs that are
+# one thought (`self.page, self.text = a, b`-shaped bookkeeping), and splitting
+# them makes the surrounding logic harder to read rather than easier. Every
+# other default rule is on, including the ones that caught a duplicate dict key
+# silently discarding a section's own note, and seven values computed and thrown
+# away.
+ignore = ["E702"]

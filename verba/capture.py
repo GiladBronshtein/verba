@@ -29,7 +29,7 @@ import yaml
 from . import forms
 from .healing import Healer
 from .masking import Masker
-from .readonly import Guard, UnsafeStep, check_step
+from .readonly import Guard, check_step
 
 VIEWPORT = {"width": 1440, "height": 768}
 DEFAULT_TIMEOUT = 20000
@@ -360,7 +360,7 @@ class Capture:
             for step in screen.steps:
                 try:
                     self._run_step(page, step, phase="readonly", log=emit)
-                except Exception as e:
+                except Exception:
                     key = next((k for k in ("click", "click_text", "wait_for", "hover")
                                 if k in step), None)
                     if not (key and self.healer.enabled):

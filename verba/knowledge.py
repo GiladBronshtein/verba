@@ -23,7 +23,6 @@ from __future__ import annotations
 from .atomic import write_json
 import json
 import re
-from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path

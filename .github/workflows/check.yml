@@ -1,0 +1,43 @@
+name: check
+
+# Eighteen tests existed and nothing ran them on a push, which means they were
+# a thing the author ran when they remembered. The suite builds a project from
+# scratch with the wizard and tests the engine against that, so it needs a
+# browser: an engine whose whole claim is that it works on a product it has
+# never seen should be tested that way in CI too.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[assist,dev]"
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Lint
+        run: ruff check verba tools
+
+      - name: Selftest
+        run: python tools/selftest.py
+
+      - name: The demo document still builds
+        run: |
+          python -m verba --root examples/meridian-docs lint
+          python -m verba --root examples/meridian-docs build

@@ -5,7 +5,6 @@ content tree as the DOCX and needs neither Word nor LibreOffice installed.
 """
 from __future__ import annotations
 
-import re
 from datetime import date
 from pathlib import Path
 

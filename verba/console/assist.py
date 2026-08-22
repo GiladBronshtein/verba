@@ -11,7 +11,6 @@ fails, the console says so and the rest of the pipeline carries on unaffected.
 """
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
@@ -251,7 +250,7 @@ def _call_messages(client, system: str, prompt: str, backend: str) -> AssistResu
             return AssistResult(False, backend=backend, error=(
                 f"the model returned no text. It stopped because {stop!r} after "
                 f"{msg.usage.output_tokens} token(s)"
-                + (f", all of it thinking" if thought else "")
+                + (", all of it thinking" if thought else "")
                 + f", even with {budget} to work in. The section may be too "
                   f"large to rewrite in one piece."))
         return AssistResult(False, backend=backend, error=(

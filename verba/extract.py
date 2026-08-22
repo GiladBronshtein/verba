@@ -12,8 +12,6 @@ import io
 import re
 from pathlib import Path
 
-import numpy as np
-import yaml
 from docx import Document
 from docx.shared import RGBColor
 from PIL import Image

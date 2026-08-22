@@ -14,7 +14,6 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
 from PIL import Image
 
 from .imaging import auto_crop_image, distance, fingerprint

@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import difflib
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from PIL import Image
 
 from .naming import is_not_a_control
 

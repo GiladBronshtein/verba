@@ -10,7 +10,7 @@ import json
 import re
 from functools import lru_cache
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 ERROR, WARN, INFO = "error", "warning", "info"
@@ -262,8 +262,6 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         if not _allowed(project, finding.rule, finding.section, finding.detail):
             findings.append(finding)
 
-    f = findings
-
     # -- structure -------------------------------------------------------
     for sid in project.missing():
         add(Finding("STRUCT-01", ERROR, sid, "outline references a section that has no file"))
@@ -388,7 +386,6 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
 
     # -- assets -----------------------------------------------------------
     used: dict[str, list[str]] = {}
-    prev_by_section: dict[str, str | None] = {}
     for node in project.nodes:
         sec = node.section
         if sec is None:

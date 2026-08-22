@@ -3088,12 +3088,12 @@ function drawSection(m) {
   m.append(ab);
 
   const smeta = S.sections.find(x => x.id === d.id) || {};
-  if ((smeta.notes || []).length) {
+  if ((smeta.decided || []).length) {
     const np = el('div', 'panel');
     np.append(el('h3', null, icon('info') + 'Decisions already made here'));
     np.append(el('div', 'muted',
       'Declined with a reason. Every crawl and every proposal is told about these.'));
-    smeta.notes.forEach(nt => {
+    smeta.decided.forEach(nt => {
       const c = el('div', 'note-card');
       c.innerHTML = `<b>${esc(nt.line)}</b><div>${esc(nt.reason)}</div>
         <div class="muted">${esc((nt.at || '').replace('T', ' '))}</div>`;

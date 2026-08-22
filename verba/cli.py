@@ -52,7 +52,7 @@ from .incidents import Incidents
 from .knowledge import Knowledge
 from .sweep import Sweep
 from .lint import ERROR, lint, summarise
-from .model import Block, Section, load_section
+from .model import Block, Section
 from .project import Project
 from .render.docx import DocxRenderer
 from .render.html import HtmlRenderer
@@ -259,7 +259,7 @@ def cmd_capture(args):
                           and f.rule in ("CONTENT-03", "STYLE-06")})
         if fixable:
             print()
-            print(f"checking what the crawl did to the rules ...")
+            print("checking what the crawl did to the rules ...")
             Tidy(p2, root).run(fixable, log=print)
 
     for e in manifest.get("errors", []):
@@ -498,7 +498,7 @@ def cmd_tidy(args):
         print(f"{e.number} {e.title}")
         for note in e.notes:
             print(f"    {note}")
-    print(f"\nreview the diffs in the console, or write all of them with:")
+    print("\nreview the diffs in the console, or write all of them with:")
     print("  python3 -m verba tidy --apply")
     return 0
 
@@ -1140,7 +1140,7 @@ def cmd_history(args):
         if not sec:
             print(f"no section {args.id!r}")
             return 1
-        rev = h.restore(args.id, args.restore, sec.path)
+        h.restore(args.id, args.restore, sec.path)
         print(f"restored {args.id} to {args.restore}")
         return 0
     entries = h.entries(args.id or None, limit=args.limit)
@@ -1290,10 +1290,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("status").set_defaults(func=cmd_status)
 
-    l = sub.add_parser("lint")
-    l.add_argument("--level", default="all", choices=["all", "error", "warning", "info"])
-    l.add_argument("--strict", action="store_true", help="exit non-zero on errors")
-    l.set_defaults(func=cmd_lint)
+    lt = sub.add_parser("lint")
+    lt.add_argument("--level", default="all", choices=["all", "error", "warning", "info"])
+    lt.add_argument("--strict", action="store_true", help="exit non-zero on errors")
+    lt.set_defaults(func=cmd_lint)
 
     b = sub.add_parser("build")
     b.add_argument("--out")

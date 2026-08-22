@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -301,7 +301,6 @@ def _drop_items(text: str, names: list[str]) -> tuple[str, int]:
             if lead <= len(indent) and nxt.lstrip().startswith("```"):
                 break
             block.append(nxt); j += 1
-        joined = "".join(block)
         if label in wanted:
             dropped += 1
         else:
@@ -512,7 +511,9 @@ class Sweep:
 
             from .model import parse_section
             try:
-                parsed = parse_section(after, sec.path)
+                # called for the exception, not the result: this is the check
+                # that a figure line did not break the section it was added to
+                parse_section(after, sec.path)
             except Exception as e:
                 self.skipped.append(f"{sec.id}: adding a figure did not parse: {e}")
                 return None
@@ -547,7 +548,6 @@ class Sweep:
         cannot be damaged by anything the model does. A name it declines to
         answer keeps its marker, which is the honest outcome and a visible one.
         """
-        from .console import assist
         from .capture import merged_inventory
 
         merged, _ = merged_inventory(self.root / "capture")

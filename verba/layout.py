@@ -73,7 +73,8 @@ def read(root: Path | str = ".") -> dict:
         "margin_top": round(page.margin_top, 1),
         "margin_bottom": round(page.margin_bottom, 1),
         "figure_overflows": width * 10 > page.text_width_mm + 0.5,
-        "fields": [{"key": k, "label": l, "group": g, "why": w} for k, l, g, w in FIELDS],
+        "fields": [{"key": k, "label": lb, "group": g, "why": w}
+                   for k, lb, g, w in FIELDS],
     }
 
 

@@ -22,7 +22,6 @@ from docx.shared import Cm, Mm, Pt, RGBColor
 from PIL import Image, ImageDraw, ImageFont
 
 from ..imaging import auto_crop_image
-from ..model import Node
 from ..theme import THEME, Theme
 
 ICON_MARKER = re.compile(r"\[icon:([^\]\s]+)(?:\s+=([\d.]+)cm)?\]")

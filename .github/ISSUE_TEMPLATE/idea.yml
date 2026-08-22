@@ -1,0 +1,16 @@
+name: An idea
+description: Something the tool should do and does not
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The situation, not the feature. A description of the problem survives a
+        change of mind about the solution.
+    validations: { required: true }
+  - type: textarea
+    id: today
+    attributes:
+      label: How you handle it today

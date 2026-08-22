@@ -61,7 +61,8 @@ class _tee:
         self.buf = ""
 
     def __enter__(self):
-        import contextlib, sys
+        import contextlib
+        import sys
         self.real = sys.stdout
         self._redirect = contextlib.redirect_stdout(self)
         self._redirect.__enter__()
@@ -108,7 +109,6 @@ class Auto:
             self.rounds_run = r
             emit("")
             emit(f"round {r}")
-            before = self._errors()
 
             if crawl and r == 1:
                 self._step("look at the live system", self._crawl_what_is_needed, emit)

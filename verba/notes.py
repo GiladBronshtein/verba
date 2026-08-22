@@ -194,9 +194,8 @@ def resolve(note: Note, project, root: Path, log=None) -> tuple[str, str]:
 
 
 def _carry_out(answer: str, note: Note, sec, node, screens, root: Path, emit):
-    from .history import History
 
-    line = next((l.strip() for l in answer.splitlines() if l.strip()), "")
+    line = next((line.strip() for line in answer.splitlines() if line.strip()), "")
     if not line:
         return STUCK, "the writer answered with nothing"
 
@@ -341,7 +340,8 @@ def _evidence(sec, root: Path) -> tuple[str, list]:
 
 
 def _numbered(body: str) -> str:
-    return "\n".join(f"{i:>4} | {l}" for i, l in enumerate(body.splitlines(), 1))
+    return "\n".join(f"{i:>4} | {line}"
+                     for i, line in enumerate(body.splitlines(), 1))
 
 
 def _unquote(s: str) -> str:

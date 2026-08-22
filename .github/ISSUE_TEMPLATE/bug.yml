@@ -1,0 +1,33 @@
+name: Something is wrong
+description: Report behaviour that does not match what the tool says it does
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste screenshots of a system you do not want made public.
+        This project's whole point is that documentation should not leak one
+        customer's account into another's, and an issue tracker is more public
+        than a document.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations: { required: true }
+  - type: textarea
+    id: output
+    attributes:
+      label: What the tool printed
+      description: The command and its output, or the console's job log.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: "`verba --version`, or the commit you are on."
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options: [The command line, The console, Both, Not sure]

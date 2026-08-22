@@ -11,7 +11,7 @@ import hashlib
 from .atomic import write_json
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 STATE = ".verba/releases.json"

@@ -301,14 +301,14 @@ def t_settings_keep_prose():
     import yaml
     from verba import layout
     d = fresh()
-    was = {f: [l for l in (d / "content" / f).read_text().splitlines()
-               if l.strip().startswith("#")]
+    was = {f: [line for line in (d / "content" / f).read_text().splitlines()
+               if line.strip().startswith("#")]
            for f in ("typography.yaml", "doc.yaml")}
     layout.apply(d, paper="Letter", side=20, align="justify", hyphens="off",
                  screenshot_width_cm=12, toc_depth=2)
     for f, before in was.items():
-        now = [l for l in (d / "content" / f).read_text().splitlines()
-               if l.strip().startswith("#")]
+        now = [line for line in (d / "content" / f).read_text().splitlines()
+               if line.strip().startswith("#")]
         eq(now, before, f"writing a setting rewrote the prose in {f}: ")
     cfg = yaml.safe_load((d / "content" / "doc.yaml").read_text())
     ok(cfg.get("outline"), "the outline was disturbed")
@@ -501,8 +501,14 @@ def t_atomic_writes():
     eq(got, 600, "writes were lost under concurrency: ")
 
     # and every store actually goes through it, or the guarantee is decorative
-    import verba.decisions, verba.knowledge, verba.notes, verba.incidents
-    import verba.assets, verba.masking, verba.version, verba.workspaces
+    import verba.decisions
+    import verba.knowledge
+    import verba.notes
+    import verba.incidents
+    import verba.assets
+    import verba.masking
+    import verba.version
+    import verba.workspaces
     import inspect as _i
     for mod in (verba.decisions, verba.knowledge, verba.notes, verba.incidents,
                 verba.assets, verba.masking, verba.version, verba.workspaces):

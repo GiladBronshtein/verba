@@ -22,7 +22,7 @@ from ..capture import (Capture, latest_capture, load_routes, load_screens,
                        merged_inventory)
 from ..masking import Masker
 from ..readonly import lint_screens
-from ..decisions import DECLINED, Decisions
+from ..decisions import Decisions
 from ..drift import analyse, to_markdown
 from ..environments import Environment, Environments
 from ..healing import Healer, apply_repairs
@@ -34,7 +34,7 @@ from ..typography import Typography
 from .. import forms as formlib
 from .. import glyphs
 from ..lint import lint, remedy as _lint_remedy, summarise
-from ..model import load_section, parse_section
+from ..model import parse_section
 from ..project import Project
 from ..render.docx import DocxRenderer
 from ..render.html import HtmlRenderer
@@ -237,10 +237,14 @@ class ConsoleState:
                 "path": str(sec.path.relative_to(self.root)) if sec.path else "",
                 "changes": len([e for e in hist_index.get(sec.id, [])
                                 if e.get("action") != "baseline"]),
-                "notes": [{"line": d.line, "reason": d.reason, "at": d.at,
-                           "change": {**d.change, "section": d.section,
-                                      "line": d.line}}
-                          for d in self.decisions.declined_for(sec.id)],
+                # Not "notes": that name already belongs to the section's own
+                # front-matter note, and the second key in a dict literal wins
+                # silently. A stale section's explanation was being replaced by
+                # this list and never shown to anyone.
+                "decided": [{"line": d.line, "reason": d.reason, "at": d.at,
+                             "change": {**d.change, "section": d.section,
+                                        "line": d.line}}
+                            for d in self.decisions.declined_for(sec.id)],
             })
 
         return {
@@ -634,7 +638,7 @@ class ConsoleState:
             out.write_text(to_markdown(rep, p), encoding="utf-8")
             for k, v in rep.summary().items():
                 log(f"  {k}: {v}")
-            log(f"wrote review/DRIFT.md")
+            log("wrote review/DRIFT.md")
             return rep.summary()
         return self.jobs.start("drift", run)
 
