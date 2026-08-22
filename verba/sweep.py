@@ -506,6 +506,18 @@ class Sweep:
                      f"one needs its own capture")
                 continue
 
+            # A picture somebody took out of this section on purpose must not be
+            # put back by the step that fills empty sections. These two ran
+            # against each other for four rounds in the real document: the
+            # decider removed a figure because it showed the wrong screen, this
+            # offered it again because the section had none, and the finding
+            # never cleared however many times the button was pressed.
+            retired = (self.project.assets.registry.get(shot) or {}).get("retired")
+            if retired and retired.get("from") == sec.id:
+                emit(f"  {node.number} {sec.title}: {shot} was taken out of this "
+                     f"section on purpose, so it is not offered back")
+                continue
+
             before = sec.to_markdown()
             after = _insert_figure(before, shot, sec.title)
             if after == before:

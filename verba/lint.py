@@ -549,8 +549,15 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                         f"this file, so no capture will ever replace it."))
 
     for name in project.assets.all_names():
-        if name not in held:
-            add(Finding("ASSET-05", INFO, "", f"asset is not referenced anywhere: {name}"))
+        if name in held:
+            continue
+        # A picture the loop retired on purpose is not a loose end. It was
+        # taken out for a reason, the reason is recorded beside it, and
+        # reporting it back as unreferenced turns one settled finding into a
+        # new one.
+        if (registry.get(name) or {}).get("retired"):
+            continue
+        add(Finding("ASSET-05", INFO, "", f"asset is not referenced anywhere: {name}"))
 
     # A section whose screen captures under a different filename than the section
     # references will crawl happily and change nothing: the new image lands
@@ -580,6 +587,14 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         if sec is None or node.level < 2:
             continue
         if sec.screens and not sec.screenshots():
+            # Unless its figure was taken out on purpose. A section left without
+            # a picture by a decision the loop recorded is in the state somebody
+            # chose, and telling them about it is telling them about their own
+            # decision.
+            retired = any((rec or {}).get("retired", {}).get("from") == sec.id
+                          for rec in (getattr(project.assets, "registry", {}) or {}).values())
+            if retired:
+                continue
             add(Finding("ASSET-06", INFO, f"{node.number} {sec.id}",
                         "section maps to a screen but shows no screenshot"))
 

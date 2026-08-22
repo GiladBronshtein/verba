@@ -467,6 +467,37 @@ def t_readonly():
     return "reads pass, writes abort, sign-in is the one logged exception"
 
 
+@check("no two steps can undo each other forever")
+def t_no_tug_of_war():
+    """Two steps with opposite goals and no knowledge of each other.
+
+    In the real document the decider removed a figure because it showed the
+    wrong screen, and the sweep offered the same figure back because the section
+    then had none. Four rounds of it are in that project's history, and the
+    finding never cleared however many times the button was pressed. Whatever
+    one step retires, another must not reinstate.
+    """
+    import inspect as _i
+
+    from verba import auto, sweep
+
+    settle = _i.getsource(auto.Auto._settle_the_rest)
+    ok('"retired"' in settle,
+       "the decider removes a figure without recording that it was on purpose")
+
+    offer = _i.getsource(sweep.Sweep)
+    ok('retired' in offer,
+       "the sweep can offer back a figure the decider deliberately removed")
+
+    # and the rules stop counting the consequences as new work
+    from verba import lint as lintmod
+    src = _i.getsource(lintmod)
+    ok(src.count('"retired"') >= 2,
+       "a retired picture is still reported as unreferenced, or its section as "
+       "having no figure, which turns one settled finding into two new ones")
+    return "retirement is recorded, honoured, and not reported back"
+
+
 @check("two writers cannot lose each other's work")
 def t_atomic_writes():
     """Every store here is read whole, changed, and written whole. That is the
@@ -697,7 +728,7 @@ def main() -> int:
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,
-             t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
+             t_no_tug_of_war, t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_model]
     for t in tests:

@@ -908,6 +908,15 @@ class Auto:
                 emit(f"      put back: removing {d['file']} broke a rule")
                 proj = self._project()
                 continue
+            # Retired on purpose, and recorded as such. Otherwise the next
+            # lint run reports the picture as unreferenced and the section as
+            # having a screen with no figure, and the loop hands back two new
+            # findings for every one it settled. Work the system made for
+            # itself is not work for a person.
+            reg = proj.assets.registry.setdefault(d["file"], {})
+            reg["retired"] = {"when": datetime.now().strftime("%Y-%m-%d"),
+                              "from": sec.id, "why": d["why"][:200]}
+            proj.assets.save()
             History(self.root).record(
                 sec.id, sec.path, before, after, actor="auto", action="decide",
                 note=f"took {d['file']} out of {sec.id}: {d['why'][:120]}")
