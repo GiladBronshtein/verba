@@ -144,6 +144,8 @@ class Auto:
                        self._replace_unchecked_pictures, emit)
             self._step("look at the pictures nobody has checked",
                        self._look_at_pictures, emit)
+            self._step("check each picture is of what its section describes",
+                       self._check_pictures_match, emit)
             self._step("decide what nothing else could settle",
                        self._settle_the_rest, emit)
             self._step("rewrite what the rules object to", self._polish, emit)
@@ -542,6 +544,59 @@ class Auto:
                     if sid in merged.get("screens", {})}
         except Exception:
             return {}
+
+    def _check_pictures_match(self, emit) -> str:
+        """Is each picture actually of the thing its section describes?
+
+        Every other rule about a picture asks where it came from or what is
+        written in it. None of them asks the question a reader answers in a
+        second: is this a picture of what I am reading about? A chapter called
+        Dashboard Overview illustrated by the demand partners list passes the
+        lot.
+
+        This reports rather than changes anything. Which picture a section
+        should show is a decision about the document, and the honest output is
+        to say clearly that these two do not go together.
+        """
+        from .console import assist
+
+        proj = self._project()
+        already = self._matched if hasattr(self, "_matched") else set()
+        checked = 0
+        for node in proj.nodes:
+            sec = node.section
+            if sec is None:
+                continue
+            for b in sec.blocks:
+                if b.kind != "screenshot":
+                    continue
+                name = b.attrs.get("file", "")
+                if not name or not proj.assets.exists(name):
+                    continue
+                key = (sec.id, name)
+                if key in already:
+                    continue
+                already.add(key)
+                text = " ".join(x.text for x in sec.blocks if x.kind == "paragraph")
+                res = assist.matches_section(
+                    proj.asset_path(name), node.number, sec.title, text,
+                    caption=b.attrs.get("caption", ""))
+                if not res.ok:
+                    self._describe_blocked = (res.error or "")[:120]
+                    self._matched = already
+                    return ""
+                fits, what = assist.read_match(res.output)
+                checked += 1
+                if not fits:
+                    emit(f"      {node.number} {sec.title}: the picture shows {what}")
+                    self.for_you.append({
+                        "what": f"{node.number} {sec.title} shows a picture of "
+                                f"something else",
+                        "why": f"{name}: {what}",
+                        "do": "Point the section at the right screen in "
+                              "content/screens.yaml, or change the section."})
+        self._matched = already
+        return f"{checked} picture(s) checked against their section" if checked else ""
 
     def _settle_the_rest(self, emit) -> str:
         """Decide the findings no mechanical step could clear.

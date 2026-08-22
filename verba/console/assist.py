@@ -648,6 +648,95 @@ Never drop the only figure a section has if the picture genuinely illustrates
 it and nothing is wrong with it."""
 
 
+MATCH_SYSTEM = """You are checking that a screenshot in a product manual shows
+what the surrounding section says it shows.
+
+You get the section's number, its title, the first of its text, and the caption
+under the picture. Then you get the picture.
+
+Answer in exactly this shape:
+
+MATCHES
+or
+WRONG: one sentence naming what the picture actually shows
+
+Judge the subject of the picture, not its quality. A picture of the accounts
+list under a section about the accounts list matches, even if the section also
+mentions other things. A picture of a completely different area of the product
+does not, however good the picture is.
+
+Be careful with sections about navigation or layout: a section about a sidebar
+or about the general shape of the interface is legitimately illustrated by a
+screenshot of any page that shows the sidebar. Do not call that wrong.
+
+Say WRONG only when the picture is plainly about a different part of the
+product from the one the section describes."""
+
+
+def matches_section(image: Path | str, number: str, title: str, text: str,
+                    caption: str = "", timeout: int = 90) -> AssistResult:
+    """Does this picture show what the section says it shows?
+
+    The system checks that a picture came from a capture, and that it carries no
+    forbidden name. It never checked the one thing a reader notices first, which
+    is whether the picture is of the thing being described. A chapter called
+    Dashboard Overview illustrated by the demand partners list passes every
+    other rule in here.
+    """
+    import base64
+
+    path = Path(image)
+    if not path.exists():
+        return AssistResult(False, error=f"no picture at {path}")
+    kind = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    brief = (f"Section {number}: {title}\n"
+             f"Caption under the picture: {caption or '(none)'}\n"
+             f"What the section says: {(text or '').strip()[:600]}")
+
+    ok_, why = available()
+    if not ok_:
+        return AssistResult(False, error=why)
+    try:
+        import anthropic
+    except ImportError:
+        return AssistResult(False, error="the anthropic package is not installed")
+
+    if LITELLM_BASE and gateway_key():
+        client = anthropic.Anthropic(base_url=LITELLM_BASE, api_key=gateway_key(),
+                                     timeout=timeout)
+        backend = "litellm"
+    else:
+        key = os.environ.get("ANTHROPIC_API_KEY") or stored_api_key()
+        if not key:
+            return AssistResult(False, error=(
+                "looking at a picture needs a key. Add one under Set up, "
+                "The writer."))
+        client = anthropic.Anthropic(api_key=key, timeout=timeout)
+        backend = "api"
+
+    try:
+        msg = client.messages.create(
+            model=DEFAULT_MODEL, max_tokens=300, system=MATCH_SYSTEM,
+            messages=[{"role": "user", "content": [
+                {"type": "text", "text": brief},
+                {"type": "image", "source": {
+                    "type": "base64", "media_type": kind,
+                    "data": base64.standard_b64encode(path.read_bytes()).decode()}},
+            ]}])
+        return AssistResult(True, output=_text_of(msg).strip(), backend=backend)
+    except Exception as e:
+        return AssistResult(False, error=str(e)[:300], backend=backend)
+
+
+def read_match(text: str) -> tuple[bool, str]:
+    first = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
+    if first.upper().startswith("MATCHES"):
+        return True, ""
+    if first.upper().startswith("WRONG"):
+        return False, first.split(":", 1)[1].strip() if ":" in first else first
+    return True, ""      # unparseable is not an accusation
+
+
 def decide(finding: dict, sections: list[dict], edition: str = "",
            timeout: int = 90) -> AssistResult:
     """Ask for a decision on a finding nothing mechanical could settle."""
