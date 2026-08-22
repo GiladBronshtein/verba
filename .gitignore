@@ -11,3 +11,6 @@ dist/
 capture/
 .verba/
 content/masking-map.json
+
+# advisory locks, created at runtime
+*.json.lock
