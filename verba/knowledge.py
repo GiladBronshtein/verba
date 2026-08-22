@@ -20,6 +20,7 @@ caller alone.
 """
 from __future__ import annotations
 
+from .atomic import write_json
 import json
 import re
 from collections import Counter
@@ -64,10 +65,10 @@ class Knowledge:
     def save(self):
         path = self.root / STORE
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
+        write_json(path, {
             "updated": datetime.now().isoformat(timespec="seconds"),
             "terms": self.terms, "phrasing": self.phrasing[-200:],
-        }, indent=2, ensure_ascii=False), encoding="utf-8")
+        })
 
     # ------------------------------------------------------------------
     def learn_vocabulary(self, project) -> int:

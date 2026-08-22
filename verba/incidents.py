@@ -19,6 +19,7 @@ thing to permit than that.
 from __future__ import annotations
 
 import hashlib
+from .atomic import write_json
 import json
 import platform
 import sys
@@ -80,8 +81,7 @@ class Incidents:
         path.parent.mkdir(parents=True, exist_ok=True)
         keep = sorted(self.items.values(), key=lambda i: i.last_at or i.at,
                       reverse=True)[:MAX_KEEP]
-        path.write_text(json.dumps([i.to_dict() for i in keep], indent=2,
-                                   ensure_ascii=False), encoding="utf-8")
+        write_json(path, [i.to_dict() for i in keep])
 
     # ------------------------------------------------------------------
     def record(self, where: str, exc: BaseException | None = None,

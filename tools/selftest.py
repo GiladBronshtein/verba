@@ -466,6 +466,52 @@ def t_readonly():
     return "reads pass, writes abort, sign-in is the one logged exception"
 
 
+@check("two writers cannot lose each other's work")
+def t_atomic_writes():
+    """Every store here is read whole, changed, and written whole. That is the
+    right shape for files a person can open and read, and it has exactly one
+    failure: two writers at once, where the second to finish wins and the
+    first's work is gone with nothing saying so.
+
+    Theoretical while one console served one project. Not theoretical once the
+    console could switch documents and the command line grew a `fix` that
+    writes while you watch the same document in a browser.
+    """
+    import json
+    import threading
+
+    from verba.atomic import update_json
+
+    root = Path(tempfile.mkdtemp(prefix="verba-lock-"))
+    store = root / "decisions.json"
+
+    def bump():
+        for _ in range(150):
+            with update_json(store) as box:
+                box[0]["n"] = box[0].get("n", 0) + 1
+
+    store.write_text(json.dumps({"n": 0}))
+    threads = [threading.Thread(target=bump) for _ in range(4)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+
+    got = json.loads(store.read_text())["n"]
+    eq(got, 600, "writes were lost under concurrency: ")
+
+    # and every store actually goes through it, or the guarantee is decorative
+    import verba.decisions, verba.knowledge, verba.notes, verba.incidents
+    import verba.assets, verba.masking, verba.version, verba.workspaces
+    import inspect as _i
+    for mod in (verba.decisions, verba.knowledge, verba.notes, verba.incidents,
+                verba.assets, verba.masking, verba.version, verba.workspaces):
+        src = _i.getsource(mod)
+        ok("write_json" in src,
+           f"{mod.__name__.split('.')[-1]} still writes its store unguarded")
+    return "600/600 concurrent writes kept, 8 stores locked"
+
+
 @check("an approval is permission, not a record that it was applied")
 def t_approval_is_permission():
     """A change approved but never landed must not be skipped forever.
@@ -643,7 +689,7 @@ def main() -> int:
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,
-             t_approval_is_permission, t_auto_decline_is_not_binding,
+             t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_model]
     for t in tests:

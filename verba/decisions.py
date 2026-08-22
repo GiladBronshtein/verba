@@ -15,6 +15,7 @@ Two things then use that record:
 from __future__ import annotations
 
 import hashlib
+from .atomic import write_json
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -109,10 +110,10 @@ class Decisions:
     def save(self):
         path = self.root / STORE
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({
+        write_json(path, {
             "decisions": [d.to_dict() for d in self.items.values()],
             "reversed": self.reversed_[-300:],
-        }, indent=2, ensure_ascii=False), encoding="utf-8")
+        })
 
     # ------------------------------------------------------------------
     def record(self, change: dict, verdict: str, reason: str = "",

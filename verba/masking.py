@@ -12,6 +12,7 @@ Screenshots therefore stay consistent between revisions.
 """
 from __future__ import annotations
 
+from .atomic import write_json
 import json
 import re
 from dataclasses import dataclass, field
@@ -254,10 +255,8 @@ class Masker:
         if not self.map_path:
             return
         self.map_path.parent.mkdir(parents=True, exist_ok=True)
-        self.map_path.write_text(
-            json.dumps({"map": self.map, "counters": self.counters},
-                       indent=2, ensure_ascii=False, sort_keys=True),
-            encoding="utf-8")
+        write_json(self.map_path, {"map": self.map, "counters": self.counters},
+                   sort_keys=True)
 
     def summary(self) -> dict:
         """What masking did. `new_values` is the count people misread as zero:

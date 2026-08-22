@@ -17,6 +17,7 @@ removing it from the list would lose the only record of where it was.
 """
 from __future__ import annotations
 
+from .atomic import write_json
 import json
 from datetime import datetime
 from pathlib import Path
@@ -37,7 +38,7 @@ def _load() -> dict:
 
 def _save(data: dict):
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    REGISTRY.write_text(json.dumps(data, indent=2, sort_keys=False), encoding="utf-8")
+    write_json(REGISTRY, data)
 
 
 def is_document(path: Path | str) -> bool:

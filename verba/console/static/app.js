@@ -334,6 +334,7 @@ const SETUP = [
   ['documents', 'Documents', 'layers'],
   ['editions',  'Editions',  'sections'],
   ['design',    'Design',    'palette'],
+  ['assistant', 'The writer', 'sparkle'],
 ];
 
 const NAV = [
@@ -626,6 +627,7 @@ function render() {
   if (view === 'design') return drawDesign(m);
   if (view === 'editions') return drawEditions(m);
   if (view === 'documents') return drawDocuments(m);
+  if (view === 'assistant') return drawAssistant(m);
   if (view === 'fields') return drawFields(m);
   if (view === 'findings') return drawFindings(m);
   if (view === 'section') return drawSection(m);
@@ -1346,6 +1348,115 @@ async function drawFields(m) {
   }
 }
 
+/* ------------------------------------------------------------- assistant */
+/* Which model does the writing, how it is reached, and the rules it writes by.
+
+   All three were real settings with no interface. The model and the gateway
+   lived in content/doc.yaml or in an environment variable, so the honest answer
+   to "which model is this using?" was to read a YAML file, and to "can I point
+   it at mine?" was to edit one. The writing rules were worse: a string compiled
+   into the engine, so a team that documents route paths on purpose, or writes
+   in a different register, had no way to say so and watched every pass undo
+   them. */
+async function drawAssistant(m) {
+  m.innerHTML = '';
+  m.append(el('h2', 'page', 'The writer'));
+  m.append(el('div', 'muted',
+    'Which model does the writing, how it is reached, and the rules it writes by.'));
+
+  let d;
+  try { d = await api('/api/assistant'); }
+  catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
+
+  // what is actually reachable right now, in preference order
+  const reach = el('div', 'panel');
+  reach.append(el('h3', null, 'How the model is reached'));
+  reach.append(el('div', 'muted',
+    'Tried in this order. The first that answers is used.'));
+  d.backends.forEach(b => {
+    const row = el('div', 'backend' + (b.ready ? ' on' : ''));
+    row.innerHTML =
+      `<span class="bmark">${b.ready ? '&#10003;' : '&#8212;'}</span>` +
+      `<span class="bbody"><b>${esc(b.label)}</b>` +
+      `<span class="bnote">${esc(b.note || '')}</span></span>`;
+    reach.append(row);
+  });
+  m.append(reach);
+
+  const uid = 'as' + Math.random().toString(36).slice(2, 6);
+  const cfg = el('div', 'panel');
+  cfg.append(el('h3', null, 'Where to send the writing'));
+  const g = el('div', 'grid2'); g.style.marginTop = '10px';
+  g.innerHTML = `
+    <div class="field"><label for="${uid}m">Model</label>
+      <input id="${uid}m" value="${esc(d.model || '')}" placeholder="claude-sonnet-5">
+      <div class="help">The id your gateway or provider knows this model by.</div></div>
+    <div class="field"><label for="${uid}g">Gateway <small>optional</small></label>
+      <input id="${uid}g" value="${esc(d.gateway || '')}" placeholder="https://gateway.example.com">
+      <div class="help">Leave empty to talk to Anthropic directly, or to use the
+        Claude Code CLI.</div></div>
+    <div class="field" style="grid-column:1/-1">
+      <label for="${uid}k">Key helper <small>optional</small></label>
+      <input id="${uid}k" value="${esc(d.key_helper || '')}" placeholder="~/.config/gateway-key.sh">
+      <div class="help">A script that prints the key. No key is ever stored in
+        this project or written to a log.</div></div>`;
+  cfg.append(g);
+  m.append(cfg);
+
+  m.append(el('div', 'muted',
+    'This talks the Anthropic Messages API. Claude works directly. Anything ' +
+    'else needs a gateway that speaks it on the model\u2019s behalf, which is ' +
+    'what LiteLLM and similar proxies do.' + hint(
+      'The model id is passed through untouched, so whether another provider ' +
+      'works is entirely a question about your gateway. Nothing here has been ' +
+      'tested against one, so treat it as yours to verify.')));
+
+  const rules = el('div', 'panel');
+  rules.append(el('h3', null, 'The rules it writes by'));
+  rules.append(el('div', 'muted',
+    d.house_is_custom
+      ? `Your own, kept in ${esc(d.house_path)}.`
+      : 'The built-in set. Edit it and it becomes yours, kept in ' +
+        `${esc(d.house_path)}. Empty it to go back to this.`));
+  const ta = el('textarea', 'houserules');
+  ta.value = d.house_rules || '';
+  ta.spellcheck = false;
+  ta.setAttribute('aria-label', 'House writing rules');
+  rules.append(ta);
+  m.append(rules);
+
+  const bar = el('div', 'row'); bar.style.margin = '4px 0 24px';
+  const save = el('button', 'act primary', icon('check') + 'Save');
+  save.onclick = async () => {
+    const v = (k) => (document.getElementById(uid + k).value || '').trim();
+    save.disabled = true;
+    try {
+      const r = await api('/api/assistant/set', { method: 'POST', json: {
+        model: v('m'), gateway: v('g'), key_helper: v('k'),
+        house_rules: ta.value } });
+      toast(r.message);
+      if (r.restart_hint) {
+        toast('Reload the console for a new gateway to take effect', true);
+      }
+      drawAssistant(holder());
+    } catch (e) { toast(e.message, true); save.disabled = false; }
+  };
+  const reset = el('button', 'act ghost', 'Back to the built-in rules');
+  reset.onclick = async () => {
+    if (!await modal({
+      title: 'Use the built-in writing rules?',
+      body: '<p>Your own rules are deleted and the built-in set takes over. ' +
+            'Nothing already written changes.</p>',
+      confirmLabel: 'Use the built-in set' })) return;
+    await api('/api/assistant/set', { method: 'POST', json: { house_rules: '' } });
+    toast('back to the built-in rules');
+    drawAssistant(holder());
+  };
+  bar.append(save);
+  if (d.house_is_custom) bar.append(reset);
+  m.append(bar);
+}
+
 /* ------------------------------------------------------------- documents */
 /* Which system you are documenting.
 
@@ -1643,6 +1754,7 @@ async function drawEditions(m) {
 async function drawDesign(m) {
   m.innerHTML = '';
   m.append(el('h2', 'page', 'Design'));
+  await drawThemes(m);
   m.append(el('div', 'muted',
     'The typeface the document is set in, and the one this interface uses.' + hint(
       'A face is only usable if this machine can render it. Some are installed ' +
@@ -1826,6 +1938,44 @@ async function drawLayout(m) {
   bar.append(save, back);
   p.append(bar);
   m.append(p);
+}
+
+/* The palette the document prints in.
+
+   Five of these shipped from the first day and there was no way to choose one:
+   the setting lived in content/theme.yaml and the Design view offered
+   typefaces. A theme you cannot pick is a theme nobody has. */
+async function drawThemes(m) {
+  let d;
+  try { d = await api('/api/theme'); }
+  catch (e) { return; }
+
+  m.append(el('div', 'muted',
+    'The palette the document prints in. Every one of these is measured rather ' +
+    'than eyeballed: body text at 7:1 and the accent at 4.5:1, against the ' +
+    'ground each colour actually sits on.' + hint(
+      'An accent usually fails on its own tinted callout background rather ' +
+      'than on the page, which is why each is checked there too. ' +
+      '`verba themes --check` measures whatever you have set.')));
+
+  const grid = el('div', 'themes');
+  d.themes.forEach(th => {
+    const card = el('button', 'theme' + (th.name === d.current ? ' on' : ''));
+    const sw = th.swatch.map(s => `<i style="background:#${esc(s)}"></i>`).join('');
+    card.innerHTML = `<div class="tsw">${sw}</div>
+      <div class="tname">${esc(th.label)}${th.name === d.current ? ' \u2713' : ''}</div>
+      <div class="tabout">${esc((th.about || '').trim())}</div>`;
+    card.disabled = th.name === d.current;
+    card.onclick = async () => {
+      try {
+        const r = await api('/api/theme/use', { method: 'POST', json: { use: th.name } });
+        toast(r.message);
+        drawDesign(holder());
+      } catch (e) { toast(e.message, true); }
+    };
+    grid.append(card);
+  });
+  m.append(grid);
 }
 
 /* What was decided about how this looks, why, and what holds us to it.

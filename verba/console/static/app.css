@@ -962,3 +962,32 @@ label:has(> input[type="checkbox"]) {
 .scheme button.on{background:var(--brand-soft);color:var(--brand-lift)}
 .scheme svg{width:15px;height:15px}
 .app.folded .scheme{flex-direction:column}
+
+/* the palette the document prints in */
+.themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));
+  gap:12px;margin:16px 0 26px}
+.theme{text-align:left;padding:13px;border:1px solid var(--line);border-radius:10px;
+  background:var(--panel);color:inherit;font:inherit;cursor:pointer;
+  transition:border-color var(--fast),background var(--fast)}
+.theme:hover:not(:disabled){border-color:var(--brand-lift)}
+.theme.on{border-color:var(--brand-lift);background:var(--brand-soft);cursor:default}
+.tsw{display:flex;gap:4px;margin-bottom:10px}
+.tsw i{width:26px;height:26px;border-radius:5px;display:block;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)}
+.tname{font-size:13.5px;font-weight:600}
+.tabout{font-size:12px;color:var(--text-3);margin-top:3px;line-height:1.4}
+
+/* which model, reached how, writing by what rules */
+.backend{display:flex;gap:11px;align-items:flex-start;padding:9px 0;
+  border-bottom:1px solid var(--line)}
+.backend:last-child{border-bottom:0}
+.bmark{flex:none;width:18px;text-align:center;color:var(--text-3);font-weight:700}
+.backend.on .bmark{color:var(--ok)}
+.bbody{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bbody b{font-size:13.5px;font-weight:600}
+.bnote{font-size:12px;color:var(--text-3);line-height:1.45}
+.houserules{width:100%;min-height:320px;margin-top:12px;padding:12px 14px;
+  font-family:var(--mono);font-size:12.5px;line-height:1.6;
+  background:var(--surface);color:var(--text);
+  border:1px solid var(--line);border-radius:8px;resize:vertical}
+.houserules:focus{outline:2px solid var(--brand-lift);outline-offset:-1px}

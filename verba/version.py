@@ -8,6 +8,7 @@ Output files are never overwritten.
 from __future__ import annotations
 
 import hashlib
+from .atomic import write_json
 import json
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -120,8 +121,7 @@ class ReleaseStore:
 
     def record(self, rel: Release):
         self.releases.append(rel.to_dict())
-        self.path.write_text(json.dumps(self.data, indent=2, ensure_ascii=False),
-                             encoding="utf-8")
+        write_json(self.path, self.data)
 
     def history(self, profile: str | None = None, limit: int = 12) -> list[dict]:
         rs = [r for r in self.releases if profile is None or r["profile"] == profile]

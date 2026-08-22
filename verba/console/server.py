@@ -807,6 +807,28 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/jobs/running":
                 return self.json({"job": st.jobs.running()})
 
+            if path == "/api/theme":
+                from ..theme import Theme, table
+                cur = Theme.load(st.root)
+                return self.json({
+                    "current": cur.name, "label": cur.label,
+                    "themes": table(),
+                })
+
+            if path == "/api/assistant":
+                from .. import console as _c   # noqa: F401
+                return self.json({
+                    "model": assist.DEFAULT_MODEL,
+                    "gateway": assist.LITELLM_BASE,
+                    "key_helper": assist.LITELLM_KEY_HELPER,
+                    "backends": assist.backends(),
+                    "house_rules": (assist.house_rules_path(st.root).read_text(encoding="utf-8")
+                                    if assist.house_rules_are_custom(st.root)
+                                    else assist.HOUSE_RULES),
+                    "house_is_custom": assist.house_rules_are_custom(st.root),
+                    "house_path": str(assist.house_rules_path(st.root)),
+                })
+
             if path == "/api/documents":
                 from ..workspaces import default_home, listing
                 return self.json({"documents": listing(st.root),
@@ -1112,6 +1134,57 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(str(e))
                 return self.json({"ok": True,
                                   "message": f"set in {t.face('document').label}"})
+
+            if path == "/api/theme/use":
+                import re as _re
+
+                from ..atomic import write_text as _wt
+                from ..theme import Theme, available
+                key = str((data or {}).get("use") or "").strip()
+                if key not in available():
+                    return self.fail(f"no such theme: {key!r}. "
+                                     f"try one of: {', '.join(available())}")
+                cfg = st.root / "content" / "theme.yaml"
+                text = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
+                if _re.search(r"^use:.*$", text, _re.M):
+                    text = _re.sub(r"^use:.*$", f"use: {key}", text, count=1, flags=_re.M)
+                else:
+                    text = f"use: {key}\ntokens: {{}}\n" + text
+                _wt(cfg, text)
+                st.reload()
+                return self.json({"ok": True,
+                                  "message": f"the document is now set in "
+                                             f"{Theme.named(key).label}. Rebuild to see it."})
+
+            if path == "/api/assistant/set":
+                # Written into content/doc.yaml, not into an environment
+                # variable, because a setting that lives in a shell is lost the
+                # moment somebody opens a new terminal and is invisible to the
+                # next person to pick this up.
+                from ..typography import rewrite_block
+                d = data or {}
+                cfg = st.root / "content" / "doc.yaml"
+                text = cfg.read_text(encoding="utf-8")
+                values = {}
+                for k in ("gateway", "model", "key_helper"):
+                    if k in d:
+                        values[k] = str(d[k]).strip()
+                if values:
+                    text = rewrite_block(text, "assist", values)
+                    from ..atomic import write_text as _wt
+                    _wt(cfg, text)
+                if "house_rules" in d:
+                    body = str(d["house_rules"] or "").strip()
+                    hp = assist.house_rules_path(st.root)
+                    from ..atomic import write_text as _wt2
+                    if body and body != assist.HOUSE_RULES.strip():
+                        _wt2(hp, body + "\n")
+                    elif hp.exists():
+                        hp.unlink()          # back to the built-in set
+                return self.json({"ok": True,
+                                  "message": "saved. it takes effect on the next "
+                                             "writing action",
+                                  "restart_hint": bool(values)})
 
             if path == "/api/documents/open":
                 # Re-point the whole console at another document. Everything

@@ -16,6 +16,7 @@ that quietly forgets is worse than no list.
 """
 from __future__ import annotations
 
+from .atomic import write_json
 import json
 import re
 from dataclasses import dataclass, field
@@ -67,9 +68,7 @@ class Notes:
     def save(self):
         path = self.root / STORE
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(
-            {"notes": [n.to_dict() for n in self.items]},
-            indent=2, ensure_ascii=False), encoding="utf-8")
+        write_json(path, {"notes": [n.to_dict() for n in self.items]})
 
     # ------------------------------------------------------------------
     def add(self, text: str, section: str = "", figure: str = "") -> Note:

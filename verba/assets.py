@@ -8,6 +8,7 @@ uses the image, and a registry records where each one came from.
 from __future__ import annotations
 
 import hashlib
+from .atomic import write_json
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -113,8 +114,7 @@ class AssetStore:
         return name
 
     def save(self):
-        self.registry_path.write_text(
-            json.dumps(self.registry, indent=2, sort_keys=True), encoding="utf-8")
+        write_json(self.registry_path, self.registry, sort_keys=True)
 
     def exists(self, name: str) -> bool:
         return self.path_for(name).exists()

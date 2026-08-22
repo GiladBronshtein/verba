@@ -300,7 +300,27 @@ def house_rules(root: Path | str = ".") -> str:
     heavily, and the part it has no other way of knowing.
     """
     from ..system import System
-    return f"{System.load(root).prompt_block()}\n\n---\n\n{HOUSE_RULES}"
+    # A project may replace the writing rules entirely. The built-in set is one
+    # house's, and a tool that documents anybody's product cannot also insist on
+    # one company's punctuation: a team that documents route paths on purpose,
+    # or writes in a different register, had no way to say so and watched the
+    # writer undo them every pass.
+    own = Path(root) / "content" / "house.md"
+    rules = HOUSE_RULES
+    if own.exists():
+        text = own.read_text(encoding="utf-8").strip()
+        if text:
+            rules = text
+    return f"{System.load(root).prompt_block()}\n\n---\n\n{rules}"
+
+
+def house_rules_path(root: Path | str = ".") -> Path:
+    return Path(root) / "content" / "house.md"
+
+
+def house_rules_are_custom(root: Path | str = ".") -> bool:
+    p = house_rules_path(root)
+    return p.exists() and bool(p.read_text(encoding="utf-8").strip())
 
 
 def run_model(prompt: str, system: str | None = None,
