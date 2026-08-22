@@ -159,7 +159,9 @@ aside {
   min-height: 0; min-width: 0;
 }
 
-.brand {
+/* The rail's old brand block. The header has its own, and this padding was
+   making it 58px tall inside a 54px bar. */
+aside .brand {
   display: flex; align-items: center; gap: var(--s3);
   padding: var(--s4) var(--s4) var(--s3);
 }
@@ -650,8 +652,8 @@ aside { position: relative; }
 .brand .fold:hover { color: var(--brand-lift); background: var(--panel); }
 .brand .fold .ic { transition: rotate 200ms var(--ease); }
 
-.app.folded { grid-template-columns: 56px minmax(0, 1fr); }
-.app.folded .brand .who,
+/* superseded below: folding now leaves a 46px strip carrying the way back */
+aside.folded-none,
 .app.folded .edition,
 .app.folded .tree,
 .app.folded .nav button span,
@@ -661,12 +663,12 @@ aside { position: relative; }
    fold button to the top right corner puts it straight on top of the logo,
    because there is no corner left to pin it to. Stack instead: mark, then the
    control beneath it. */
-.app.folded .brand {
+aside .brand-unused {
   flex-direction: column; gap: var(--s2);
   padding: var(--s3) 0 var(--s2); justify-content: center;
 }
-.app.folded .brand .fold { position: static; margin: 0; }
-.app.folded .brand .fold .ic { rotate: 180deg; }
+aside .brand-unused .fold { position: static; margin: 0; }
+aside .brand-unused .fold .ic { rotate: 180deg; }
 .app.folded .nav { padding: 0 var(--s2) var(--s3); }
 .app.folded .nav button { justify-content: center; padding: 9px 0; }
 .app.folded .nav button.on::before { left: -8px; }
@@ -879,8 +881,6 @@ label:has(> input[type="checkbox"]) {
    Which system you are documenting. A document is a folder; this is the list of
    where they are. */
 .modal.wide{max-width:620px}
-#docTitle{cursor:pointer}
-#docTitle:hover{color:var(--text)}
 .docs{display:flex;flex-direction:column;gap:6px;margin-top:14px;
   max-height:340px;overflow-y:auto}
 .docrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
@@ -900,16 +900,6 @@ label:has(> input[type="checkbox"]) {
 /* the document switcher in the masthead: a control, not a caption */
 /* One line, and it must stay one line: a product name wrapping under its own
    section count reads as two broken labels rather than one control. */
-#docTitle{display:flex;align-items:center;gap:5px;cursor:pointer;
-  padding:2px 5px;margin-left:-5px;border-radius:5px;min-width:0;
-  white-space:nowrap;overflow:hidden;
-  transition:background var(--fast),color var(--fast)}
-#docTitle .dnow{overflow:hidden;text-overflow:ellipsis}
-#docTitle:hover,#docTitle:focus-visible{background:var(--brand-soft);color:var(--text)}
-#docTitle .dnow{font-weight:600;color:var(--text-2)}
-#docTitle .dsep{opacity:.5}
-.dchev{width:12px;height:12px;flex:none;opacity:.7;margin-left:1px}
-#docTitle:hover .dchev{opacity:1}
 /* in the full view each row carries its own actions */
 .docrow .row{margin-left:auto;flex:none;gap:6px}
 
@@ -943,8 +933,8 @@ label:has(> input[type="checkbox"]) {
   text-transform:uppercase;letter-spacing:.09em;color:var(--brand-lift);
   background:var(--brand-soft);padding:1px 7px;border-radius:20px;line-height:1.4}
 /* the folded rail: numbers only, still in order */
-.app.folded .stepbody,.app.folded .younow{display:none}
-.app.folded .nav .step{justify-content:center;padding:8px 0}
+.app.folded aside .stepbody,.app.folded aside .younow{display:none}
+.app.folded aside .nav .step{justify-content:center;padding:8px 0}
 
 /* a small labelled grid, for "what the last capture found" */
 /* Two columns at most. Four label-and-value pairs strung across one row read
@@ -966,7 +956,7 @@ label:has(> input[type="checkbox"]) {
 .scheme button:hover{color:var(--text-2);background:var(--panel-2)}
 .scheme button.on{background:var(--brand-soft);color:var(--brand-lift)}
 .scheme svg{width:15px;height:15px}
-.app.folded .scheme{flex-direction:column}
+/* the appearance control lives in the header now, and the header does not fold */
 
 /* the palette the document prints in */
 .themes{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));
@@ -1057,7 +1047,7 @@ h3.sub{font-size:14px;font-weight:600;margin:24px 0 8px}
 .stepord{flex:none;font-family:var(--mono);font-size:12px;color:var(--text-3);
   opacity:.65;min-width:9px;margin-top:2px}
 .step.on .stepord{opacity:.9}
-.app.folded .stepord{display:none}
+.app.folded aside .stepord{display:none}
 
 /* ── the header ────────────────────────────────────────────────────────────
    Identity on the left, the process across the middle, the controls you touch
@@ -1083,19 +1073,24 @@ header.top .mark {
 header.top .wordmark {
   font-size: 15.5px; font-weight: 700; letter-spacing: -.015em;
 }
-header.top .doc {
+/* Which document, at the top of the rail: it belongs with the things that
+   change when you switch, not beside the mark that never does. */
+aside > .doc {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-radius: var(--r1);
+  margin: var(--s3) var(--s3) var(--s2);
+  padding: 8px 10px; border-radius: var(--r1);
   border: 1px solid var(--line); background: var(--surface);
-  color: var(--text-2); font: inherit; font-size: 13px; cursor: pointer;
-  max-width: 230px; white-space: nowrap; overflow: hidden;
-  transition: border-color var(--fast), color var(--fast);
+  color: var(--text); font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; overflow: hidden;
+  transition: border-color var(--fast), background var(--fast);
 }
-header.top .doc:hover { border-color: var(--brand-lift); color: var(--text); }
-header.top .doc::after {
+aside > .doc:hover { border-color: var(--brand-lift); background: var(--panel-2); }
+aside > .doc::after {
   content: ""; width: 12px; height: 12px; flex: none; opacity: .6;
+  margin-left: auto;
   background: var(--chevron) center/12px no-repeat;
 }
+.app.folded aside > .doc { display: none; }
 header.top .tools { flex: none; display: flex; align-items: center; gap: 8px; }
 header.top .tools select { min-width: 96px; }
 header.top .scheme { margin: 0; padding: 3px; }
@@ -1115,7 +1110,9 @@ header.top .scheme button { padding: 5px 7px; }
    header into a column six rows tall that fell through the page. */
 .flow {
   display: flex; align-items: stretch; gap: 2px;
-  flex: 1 1 auto; min-width: 0;
+  /* shrink-to-fit, not fill: a track stretched to the width of the window is a
+     bar with six things at one end of it and a lot of nothing after Publish */
+  flex: 0 1 auto; min-width: 0; margin-right: auto;
   overflow-x: auto; scrollbar-width: none;
 }
 .flow::-webkit-scrollbar { display: none; }
@@ -1123,23 +1120,48 @@ header.top .scheme button { padding: 5px 7px; }
    and no background these read as plain text until you happened to hover one,
    and an interface that only admits to being clickable once you are already
    pointing at it has told you nothing. */
+/* A stepper: a tick for what is done, a number for what is not, joined by a
+   line so it reads as a sequence rather than as a menu of six equal things.
+
+   Three earlier attempts put a box round each step, then round all six. Both
+   read as chrome. A stepper carries its own meaning: the marks say how far
+   along you are and the line says these are in an order, which is true, and
+   neither needs a border to say it. */
 .flow .step {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 9px; border-radius: var(--r1);
-  border: 1px solid var(--line); background: var(--surface); color: inherit;
-  font: inherit; cursor: pointer; white-space: nowrap;
-  transition: background var(--fast), border-color var(--fast),
-              transform var(--fast);
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 4px 0 0; border: 0; background: none;
+  color: var(--text-3); font: inherit; font-size: 13.5px; font-weight: 500;
+  cursor: pointer; white-space: nowrap; position: relative;
+  transition: color var(--fast);
 }
-.flow .step:hover {
-  background: var(--panel-2); border-color: var(--brand-lift);
+/* the line between one step and the next */
+.flow .step:not(:last-child)::after {
+  content: ""; width: 15px; height: 1px; flex: none;
+  background: var(--line); margin: 0 4px 0 10px;
 }
-.flow .step:active { transform: translateY(1px); }
-.flow .step:focus-visible { outline: 2px solid var(--brand-lift); outline-offset: 1px; }
-.flow .step.on {
-  background: var(--brand-soft); border-color: var(--brand-lift);
-  box-shadow: inset 0 0 0 1px var(--brand-lift);
+.flow .step:hover { color: var(--text-2); }
+.flow .step:hover .stepn { border-color: var(--brand-lift); }
+.flow .step:focus-visible { outline: 2px solid var(--brand-lift); outline-offset: 3px;
+  border-radius: 6px; }
+.flow .step.on { color: var(--text); }
+.flow .step.on .stept { font-weight: 650; }
+
+/* the mark. Its colour is the step's state, and it never carries a number once
+   the step is done, because then the number is not the useful thing about it. */
+.flow .stepn {
+  width: 21px; height: 21px; flex: none; border-radius: 50%;
+  display: grid; place-items: center;
+  font: 700 11px var(--mono); font-variant-numeric: tabular-nums;
+  background: var(--panel-2); color: var(--text-3);
+  border: 1px solid transparent;
+  transition: background var(--fast), color var(--fast), border-color var(--fast);
 }
+.flow .stepn.done      { background: var(--ok-soft);    color: var(--ok); }
+.flow .stepn.attention { background: var(--warn-soft);  color: var(--warn); }
+.flow .stepn.blocked   { background: var(--bad-soft);   color: var(--bad); }
+.flow .stepn.ready     { background: var(--brand-soft); color: var(--brand-lift); }
+.flow .step.on .stepn  { background: var(--brand); color: #fff; }
+
 .flow .stepbody { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .flow .stept { font-size: 13px; font-weight: 550; line-height: 1.2; }
 .flow .steps-sub {
@@ -1196,3 +1218,26 @@ aside .nav { padding-top: var(--s3); }
 .app.folded .foldbtn svg { transform: rotate(180deg); }
 .icon-btn.on { background: var(--brand-soft); color: var(--brand-lift);
   border-color: var(--brand-lift); }
+
+/* ── fewer lines ───────────────────────────────────────────────────────────
+   A border is a strong signal and this interface was spending it on
+   everything: the step track, the document button, every icon button, the
+   appearance control, all of them outlined, inside a header that is itself
+   outlined, beside a rail that is outlined. Six boxes in a row stop reading as
+   six controls and start reading as a grid.
+
+   Borders now separate the three regions that genuinely are separate, and the
+   small controls use a filled surface instead. A fill says "this is a thing"
+   just as clearly and does not draw a line round every one of them. */
+/* the stepper has no container: see the block above */
+aside > .doc { border-color: transparent; background: var(--panel-2); }
+aside > .doc:hover { border-color: transparent; background: var(--brand-soft); }
+.icon-btn, .foldbtn { border-color: transparent; background: transparent; }
+.icon-btn:hover, .foldbtn:hover {
+  border-color: transparent; background: var(--panel-2); color: var(--text);
+}
+header.top .scheme { border-color: transparent; background: var(--panel-2); }
+
+/* the rail no longer needs its own line: the header's is enough to say where
+   the chrome ends, and the rail sits on a different ground already */
+aside { border-right: 0; }

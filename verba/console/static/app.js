@@ -436,14 +436,18 @@ function drawSteps() {
                            (st.id === here ? ' here' : ''));
     b.dataset.v = st.id;
     b.setAttribute('aria-current', view === st.id ? 'page' : 'false');
-    // Only the step with the work in it carries its line. Six captions across a
+    // A tick for what is done and a number for what is not. The number is the
+    // step's place in the sequence, which is the one thing a stepper is for,
+    // and it stops being a number the moment the step is finished.
+    //
+    // Only the step with the work in it carries its line: six captions across a
     // header is a paragraph nobody reads, and it pushed Publish off the end at
-    // any window narrower than a very wide one. The mark still says how each
-    // step stands, and hovering gives the words.
+    // any window narrower than a very wide one.
     const detail = (st.id === here || view === st.id)
       ? `<span class="steps-sub">${esc(s.line)}</span>` : '';
+    const inside = s.tone === 'done' ? '&#10003;' : String(st.n);
     b.innerHTML =
-      `<span class="stepn ${s.tone}">${STEP_MARK[s.tone] || ''}</span>` +
+      `<span class="stepn ${s.tone}">${inside}</span>` +
       `<span class="stepbody"><span class="stept">${esc(st.label)}</span>` +
       detail + `</span>`;
     b.title = `${st.label}: ${s.line}`;
