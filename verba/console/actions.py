@@ -78,6 +78,23 @@ def apply_remove(section, kind: str, label: str) -> str:
     return f"removed {removed} {kind[:-1]} entry"
 
 
+def _run_was_masked(capture_dir: Path) -> bool:
+    """Did the crawl that produced this run have masking on?
+
+    Read from the run's own manifest rather than from the rules as they stand
+    today, because the rules can be turned on after the fact and that would
+    retroactively vouch for pictures nobody masked.
+    """
+    try:
+        import json
+        man = json.loads((Path(capture_dir) / "inventory.json").read_text(encoding="utf-8"))
+        mask = man.get("masking") or {}
+        return bool(mask.get("active", mask.get("known_values", 0) or
+                             mask.get("new_values", 0)))
+    except Exception:
+        return False
+
+
 def apply_image(project, capture_dir: Path, asset_name: str, log=None) -> str:
     src = Path(capture_dir) / "screenshots" / asset_name
     if not src.exists():
@@ -89,6 +106,14 @@ def apply_image(project, capture_dir: Path, asset_name: str, log=None) -> str:
     shutil.copyfile(src, dest)
     entry = project.assets.registry.setdefault(asset_name, {})
     entry.update({"source": str(src), "replaced_on": date.today().isoformat()})
+    # Record that this picture came through the masking rules, and whether they
+    # were on. Provenance is the only thing that can be checked later: the rules
+    # run in the browser milliseconds before the shutter, and nothing about the
+    # resulting PNG says whether they did. Without this, a picture lifted out of
+    # an old Word file and a picture taken under full masking are the same file
+    # on disk with the same claim to be in the document.
+    entry["masked"] = _run_was_masked(Path(capture_dir))
+    entry.pop("legacy_name", None)
     project.assets.save()
     r = refresh_derived(project.assets, asset_name, capture_dir=capture_dir, log=log)
     bits = []

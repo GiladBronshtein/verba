@@ -123,6 +123,7 @@ class Auto:
             self._step("fix the writing", self._tidy, emit)
             self._step("apply the differences", self._drift, emit)
             self._step("use the pictures the crawl took", self._images, emit)
+            self._step("rewrite what the rules object to", self._polish, emit)
 
             # Not "the rules are clean": a document can break no rules and still
             # have a dozen differences from the live system sitting unapplied.
@@ -413,22 +414,16 @@ class Auto:
                         f"cannot be described" + (f" ({why})" if why else ""))
         return ", ".join(bits)
 
-    def _describe(self, section_id, emit) -> bool:
-        """Write the descriptions one section is now missing, from the evidence.
+    def _assist(self, section_id, task: str, emit, note: str) -> bool:
+        """Run one writing task on one section and keep the result.
 
-        Run the moment a difference is applied rather than as a later pass,
-        because a later pass is too late: the change has been judged and put
-        back by then.
-
-        This is the `fill_todos` task, which replaces `TODO: describe this.`
-        with a real description and is told to leave the marker alone where the
-        evidence does not support one. It therefore either earns the change its
-        place or fails honestly, and a marker that survives keeps the change
-        out on the next measurement, which is the behaviour we want.
+        Every writing action the console offers a person is also something the
+        loop can do unattended. The difference is only that the loop measures
+        the rules afterwards and puts the change back if they got worse, which
+        is a stricter test than a person clicking Accept on a diff.
         """
         if not section_id:
             return False
-        from .capture import latest_capture
         from .console import assist
         from .decisions import Decisions
         from .history import History
@@ -451,8 +446,7 @@ class Auto:
                         for f in lint(p) if section_id in (f.section or "")]
             notes = Knowledge.load(self.root).bundle_for(
                 section_id, Decisions.load(self.root))
-            prompt = assist.build_prompt("fill_todos", p, sec, inv, [],
-                                         findings, notes)
+            prompt = assist.build_prompt(task, p, sec, inv, [], findings, notes)
             result = assist.run_model(prompt, log=None)
             if not result.ok:
                 self._describe_blocked = (result.error or "")[:120]
@@ -470,14 +464,49 @@ class Auto:
                 return False
             sec.path.write_text(proposed, encoding="utf-8")
             History(self.root).record(sec.id, sec.path, before, proposed,
-                                      actor="auto", action="describe",
-                                      note="described what the difference added")
-            emit(f"      described what was added to {section_id}")
+                                      actor="auto", action=task, note=note)
+            emit(f"      {note}: {section_id}")
             return True
         except Exception as e:
             self._describe_blocked = str(e)[:120]
-            emit(f"      could not describe {section_id}: {e}")
+            emit(f"      could not rewrite {section_id}: {e}")
             return False
+
+    def _polish(self, emit) -> str:
+        """Rewrite the sections whose findings say a rewrite is the fix.
+
+        Every rule finding carries the action that clears it, and for the style
+        rules that action is "rewrite to house style". The loop never ran it, so
+        "fix what can be fixed" left findings standing whose own remedy the
+        system was holding in its hand. Measured and reverted like anything
+        else, which is what makes it safe to do without being asked.
+        """
+        from .lint import lint, remedy
+        wants: dict[str, str] = {}
+        for f in lint(self._project()):
+            act = remedy(f.rule).get("action") or ""
+            if not act.startswith("assist:") or not f.section:
+                continue
+            sid = f.section.split(" ", 1)[-1].strip()
+            if sid in self._project().sections:
+                wants.setdefault(sid, act.split(":", 1)[1])
+        if not wants:
+            return ""
+        done = 0
+        for sid, task in wants.items():
+            if self._assist(sid, task, emit, "rewrote to house style"):
+                done += 1
+        return f"{done} section(s) rewritten" if done else ""
+
+    def _describe(self, section_id, emit) -> bool:
+        """Write the descriptions one section is now missing, from the evidence.
+
+        Run the moment a difference is applied rather than as a later pass,
+        because a later pass is too late: the change has been judged and put
+        back by then.
+        """
+        return self._assist(section_id, "fill_todos", emit,
+                            "described what was added to")
 
     def _inventory_for(self, sec) -> dict:
         """The newest capture of each screen this section is bound to."""

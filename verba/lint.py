@@ -178,6 +178,11 @@ REMEDIES = {
     "ASSET-08":   ("Edit the section", "open",
                    "Give it a caption only if it really is a picture of a screen; "
                    "otherwise leave it captionless and it renders as a detail."),
+    "ASSET-10":   ("Photograph this screen properly", "capture",
+                   "This picture never went through masking, so nothing has "
+                   "checked whether it shows a real customer's account. "
+                   "Photographing the screen again puts it through the masking "
+                   "rules and settles it."),
     "ASSET-09":   ("Recapture this screen", "capture",
                    "The capture came back blank."),
     "FRESH-01":   ("Mark verified", "verify", "Nobody has checked this against "
@@ -462,6 +467,27 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
             if b.kind in ("screenshot", "icon"):
                 if b.attrs.get("file"):
                     held.add(b.attrs["file"])
+
+    # Masking runs at capture time, in the browser, immediately before the
+    # shutter. That protects everything a crawl takes and says nothing at all
+    # about a picture that arrived some other way: lifted out of an older Word
+    # file, dropped in by hand, or adopted before any masking rule existed.
+    # Those are exactly the pictures most likely to carry a real customer's
+    # account into somebody else's documentation, and until now nothing looked.
+    #
+    # This does not claim the image is wrong. It says nobody has checked, which
+    # for a rule the project calls absolute is the thing worth reporting.
+    registry = getattr(project.assets, "registry", {}) or {}
+    for name in sorted(used):
+        rec = registry.get(name) or {}
+        src = str(rec.get("source", ""))
+        if "/capture/" in src or rec.get("masked"):
+            continue
+        where = ("lifted from " + str(rec.get("legacy_name"))
+                 if rec.get("legacy_name") else
+                 "added outside a crawl" if src else "no record of where it came from")
+        add(Finding("ASSET-10", WARN, "",
+                    f"picture never went through masking: {name}", where))
 
     for name in project.assets.all_names():
         if name not in held:

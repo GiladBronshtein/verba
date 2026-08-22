@@ -15,6 +15,12 @@ const ICON_PATHS = {
   publish: '<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/>',
   form: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h6"/><rect x="7" y="15" width="6" height="3" rx="1"/>',
   palette: '<path d="M12 3a9 9 0 000 18 2 2 0 001.6-3.2 2 2 0 011.6-3.2h1.7A4.1 4.1 0 0021 10.4C21 6.3 16.9 3 12 3z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>',
+  // appearance: a sun, a moon, and a half-filled disc for "whatever the
+  // machine says", which is a state and needs a mark of its own
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>',
+  contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 010 18z" fill="currentColor" stroke="none"/>',
+
   refresh: '<path d="M3 12a9 9 0 019-9 9 9 0 016.4 2.6L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-9 9 9 9 0 01-6.4-2.6L3 16"/><path d="M3 21v-5h5"/>',
 
   camera: '<path d="M3 8a2 2 0 012-2h2.2l1.2-2h6.2l1.2 2H20a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="12.5" r="3.5"/>',

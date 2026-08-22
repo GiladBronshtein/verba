@@ -534,12 +534,19 @@ def t_apply_and_describe_are_one_step():
     src = _i.getsource(Auto._drift)
     ok("_describe(" in src,
        "an applied difference is judged before what it added is described")
-    desc = _i.getsource(Auto._describe)
+    desc = _i.getsource(Auto._describe) + _i.getsource(Auto._assist)
     ok("fill_todos" in desc,
        "describing runs something other than the task that fills TODOs")
     ok("available()" in desc,
        "a missing model is not reported, so the refusal has no reason")
-    return "apply, describe, then measure"
+
+    # and every finding that names a rewrite as its fix gets one, or "fix what
+    # can be fixed" leaves standing exactly the findings whose remedy the
+    # system is holding in its hand
+    pol = _i.getsource(Auto._polish)
+    ok("assist:" in pol, "the loop ignores findings whose remedy is a rewrite")
+    ok("_polish" in _i.getsource(Auto.run), "the rewrite step is never run")
+    return "apply, describe, rewrite, then measure"
 
 
 @check("a real click on Save never reaches a real server")

@@ -33,7 +33,14 @@ def _needs_capture(project) -> list[str]:
     known = set(project.sections)
     out: list[str] = []
     for f in lint(project):
-        if f.level != "error" or remedy(f.rule).get("action") != "capture":
+        # Not only errors. "This picture never went through masking" is a
+        # warning, because nobody has proved it carries a real name, and it is
+        # also the single most valuable thing a crawl can settle. Refusing to
+        # act on it because of its level would leave the one finding the loop
+        # is best placed to clear sitting there forever.
+        if f.level not in ("error", "warning"):
+            continue
+        if remedy(f.rule).get("action") != "capture":
             continue
         if f.section and f.section in known:
             out.append(f.section)

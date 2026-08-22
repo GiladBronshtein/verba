@@ -9,6 +9,7 @@ description = "Technical documentation built from the running system, not from m
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
+license-files = ["LICENSE"]
 authors = [{ name = "Gilad Bronshtein" }]
 keywords = ["documentation", "technical-writing", "playwright", "docx", "screenshots"]
 classifiers = [
@@ -31,6 +32,12 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff>=0.5"]
+# The writing assistance talks to a model over the Anthropic Messages API. It is
+# optional because capture, drift, lint, build and release do not need it, and a
+# documentation tool should not require a model to render a document. It was
+# imported without ever being declared, so a clean install produced a console
+# whose assistance was permanently unavailable and blamed the user's machine.
+assist = ["anthropic>=0.40"]
 
 [project.urls]
 Homepage = "https://github.com/GiladBronshtein/verba"

@@ -368,6 +368,45 @@ function ago(stamp) {
 
 const NAV_IDS = NAV.flatMap(g => g.items.map(i => i[0]));
 
+/* Light, dark, or whatever the machine says.
+
+   Three states rather than two. A two-way switch has to decide what "off"
+   means and gets it wrong for everyone whose machine is set the other way, so
+   Follow is a real option and it is the default. */
+const SCHEMES = [['system', 'Follow the system'], ['light', 'Light'], ['dark', 'Dark']];
+
+function scheme() {
+  return localStorage.getItem('verba.scheme') || 'system';
+}
+
+function setScheme(v) {
+  if (v === 'system') {
+    localStorage.removeItem('verba.scheme');
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    localStorage.setItem('verba.scheme', v);
+    document.documentElement.setAttribute('data-theme', v);
+  }
+  drawNav();
+}
+
+function schemeControl() {
+  const wrap = el('div', 'scheme');
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', 'Appearance');
+  const now = scheme();
+  SCHEMES.forEach(([v, label]) => {
+    const b = el('button', v === now ? 'on' : '', icon(
+      v === 'light' ? 'sun' : v === 'dark' ? 'moon' : 'contrast'));
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.setAttribute('aria-pressed', v === now ? 'true' : 'false');
+    b.onclick = () => setScheme(v);
+    wrap.append(b);
+  });
+  return wrap;
+}
+
 function drawNav() {
   const n = $('#nav'); n.innerHTML = '';
   const here = currentStage().id;
@@ -415,7 +454,7 @@ function drawNav() {
   const r = el('button', 'quiet', icon('refresh') + '<span>Reload</span>');
   r.title = 'Read the content tree again from disk';
   r.onclick = () => refresh().then(() => toast('Reloaded from disk'));
-  n.append(el('div', 'spacer'), r);
+  n.append(el('div', 'spacer'), r, schemeControl());
 }
 
 function drawTree() {

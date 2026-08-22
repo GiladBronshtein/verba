@@ -9,6 +9,16 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/fonts.css">
+<script>
+  /* Before the first paint, or the page flashes the wrong palette and then
+     corrects itself, which reads as a bug every single time it loads. */
+  (function () {
+    var v = localStorage.getItem('verba.scheme');
+    if (v === 'light' || v === 'dark') {
+      document.documentElement.setAttribute('data-theme', v);
+    }
+  })();
+</script>
 </head>
 <body>
 <div id="sprite"></div>
