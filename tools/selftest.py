@@ -467,6 +467,36 @@ def t_readonly():
     return "reads pass, writes abort, sign-in is the one logged exception"
 
 
+@check("a rewrite can never drop a figure")
+def t_rewrites_keep_figures():
+    """A model asked to reconcile a section is being asked about labels and
+    sentences, not about whether the section should have pictures.
+
+    It answered that question anyway. One rewrite took a section from thirteen
+    figures to two, and because a missing figure is only an INFO finding, the
+    measurement guarding every other step waved it through: errors before,
+    errors after, unchanged, keep it. Fourteen pictures left a real document
+    that way and had to be restored from history.
+    """
+    import inspect as _i
+
+    from verba.auto import Auto, _figures_of, _keeps_every_figure
+
+    had = "t\n![One](a.png)\n![Two](b.png =14cm)\nx"
+    eq(_figures_of(had), ["a.png", "b.png"], "figures not found: ")
+    ok(_keeps_every_figure(had, had), "an identical rewrite was rejected")
+    ok(not _keeps_every_figure(had, "t\n![One](a.png)\nx"),
+       "a rewrite that drops a figure was allowed")
+    ok(_keeps_every_figure(had, had + "\n![Three](c.png)"),
+       "adding a figure was treated as losing one")
+
+    # and every path that writes a whole section back is guarded
+    for fn in (Auto._review_against_evidence, Auto._assist):
+        ok("_keeps_every_figure" in _i.getsource(fn),
+           f"{fn.__name__} can write a rewrite that drops a figure")
+    return "no whole-section rewrite can lose a picture"
+
+
 @check("no two steps can undo each other forever")
 def t_no_tug_of_war():
     """Two steps with opposite goals and no knowledge of each other.
@@ -728,7 +758,7 @@ def main() -> int:
              t_theme_applied, t_system_description, t_page_setup,
              t_layout_atomic, t_settings_keep_prose, t_editions,
              t_neutral_edition,
-             t_no_tug_of_war, t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
+             t_rewrites_keep_figures, t_no_tug_of_war, t_atomic_writes, t_approval_is_permission, t_auto_decline_is_not_binding,
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_model]
     for t in tests:

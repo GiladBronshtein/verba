@@ -148,6 +148,27 @@ def _save_matches(root, data: dict):
     write_json(Path(root) / MATCHES, data)
 
 
+def _figures_of(text: str) -> list[str]:
+    """Every figure a section shows, in order."""
+    import re as _re
+    return _re.findall(r"^!\[[^\]]*\]\(([^)\s]+)", text, flags=_re.M)
+
+
+def _keeps_every_figure(before: str, after: str) -> bool:
+    """Did a rewrite hold on to every picture the section had?
+
+    A model asked to reconcile a section against the crawl is being asked about
+    labels and sentences. It is not being asked whether the section should have
+    pictures, and it must not answer that question by leaving them out.
+
+    It did. One rewrite took a section from thirteen figures to two, and because
+    a missing figure only produces an INFO finding, the measurement that guards
+    every other step waved it through: errors before, errors after, no change,
+    keep it. Fourteen pictures left the document that way.
+    """
+    return set(_figures_of(before)) <= set(_figures_of(after))
+
+
 def _drop_figure(text: str, filename: str) -> str:
     """Remove one figure line, and the blank line it leaves behind."""
     out, skipped = [], False
@@ -549,6 +570,9 @@ class Auto:
             before = sec.path.read_text(encoding="utf-8")
             if proposed.strip() == before.strip():
                 return False
+            if not _keeps_every_figure(before, proposed):
+                emit(f"      {task} on {section_id} would drop a figure, rejected")
+                return False
             sec.path.write_text(proposed, encoding="utf-8")
             History(self.root).record(sec.id, sec.path, before, proposed,
                                       actor="auto", action=task, note=note)
@@ -682,6 +706,11 @@ class Auto:
             except Exception:
                 continue
             if parsed.id != sec.id or proposed.strip() == before.strip():
+                continue
+            if not _keeps_every_figure(before, proposed):
+                lost = sorted(set(_figures_of(before)) - set(_figures_of(proposed)))
+                emit(f"        rejected: the rewrite would drop "
+                     f"{len(lost)} figure(s)")
                 continue
             sec.path.write_text(proposed, encoding="utf-8")
             if self._errors() > errors_before:
