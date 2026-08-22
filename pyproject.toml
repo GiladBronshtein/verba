@@ -88,3 +88,6 @@ ignore = ["E702"]
 "verba/scaffold.py" = ["E501"]
 "verba/system.py" = ["E501"]
 "tools/selftest.py" = ["E501"]
+# The launcher it writes is a shell script embedded as a string: its lines are
+# shell, not Python, and wrapping them changes what runs.
+"tools/build_app.py" = ["E501"]

@@ -9,7 +9,6 @@ Nothing about the pipeline lives in here: the app is a shortcut, not a fork.
 """
 from __future__ import annotations
 
-import os
 import plistlib
 import shutil
 import stat
@@ -20,13 +19,40 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parent.parent
 APP_NAME = "Verba"
 
-# What this app used to be called. A Dock tile keeps the label it was added
-# under, so after a rename the refresh looked for "Verba", found a tile labelled
-# "RiseDoc", decided the app was not in the Dock and did nothing. The tile then
-# pointed at a bundle that had been deleted: clicking it did nothing at all, no
-# bounce, no error, no log, because the launcher never ran.
-PREVIOUS_NAMES = ("RiseDoc",)
-BUNDLE_ID = "io.risecodes.verba"
+# A Dock tile keeps the label it was added under. After a rename, a refresh that
+# looks only for the current name finds nothing, concludes the app is not in the
+# Dock, and leaves a tile pointing at a bundle that has been deleted: clicking it
+# then does nothing at all, with no bounce, no error and no log, because the
+# launcher never runs.
+# A project may have been launched under an older name. Add it here and the
+# refresh will adopt that tile instead of leaving a dead one behind.
+PREVIOUS_NAMES: tuple[str, ...] = ()
+
+
+def _vendor() -> str:
+    """Who makes the product being documented, from the project's own manifest.
+
+    The bundle identifier and the copyright line used to name one company,
+    compiled into a tool meant to document anybody's product. They come from
+    content/doc.yaml now, which is where every other fact about the product
+    already lives.
+    """
+    try:
+        import yaml
+        cfg = yaml.safe_load(
+            (PROJECT / "content" / "doc.yaml").read_text(encoding="utf-8")) or {}
+        prod = cfg.get("product") or {}
+        return str(prod.get("vendor") or prod.get("name") or "verba")
+    except Exception:
+        return "verba"
+
+
+def _slug(text: str) -> str:
+    import re
+    return re.sub(r"[^a-z0-9]+", "", text.lower()) or "verba"
+
+
+BUNDLE_ID = f"local.{_slug(_vendor())}.verba"
 KEYCHAIN_SERVICE = "verba-staging"
 PORT = 8800
 
@@ -149,7 +175,7 @@ def build(dest_dir: Path) -> Path:
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
         "LSApplicationCategoryType": "public.app-category.productivity",
-        "NSHumanReadableCopyright": "Rise",
+        "NSHumanReadableCopyright": _vendor(),
     }
     with open(app / "Contents" / "Info.plist", "wb") as fh:
         plistlib.dump(info, fh)
