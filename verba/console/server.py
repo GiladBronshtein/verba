@@ -818,6 +818,39 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/jobs/running":
                 return self.json({"job": st.jobs.running()})
 
+            if path == "/api/screens":
+                # imported here rather than relied on from module scope: this
+                # handler imports it further down, which makes the name local
+                # for the whole function and unbound until that line runs
+                from .server import merged_inventory as _merged
+                site, screens = st.screens()
+                routes = st.routes()
+                proj = st.reload()
+                bound = {}
+                for sec in proj.sections.values():
+                    for sid in sec.screens:
+                        bound.setdefault(sid, []).append(sec.id)
+                merged, _ = _merged(st.root / "capture")
+                seen = merged.get("screens", {})
+                return self.json({
+                    "base_url": site.get("base_url", ""),
+                    "path": str(st.root / "content" / "screens.yaml"),
+                    "screens": [{
+                        "id": s.id,
+                        "title": getattr(s, "title", "") or s.id,
+                        "shot": getattr(s, "shot", "") or "",
+                        "sections": sorted(set(list(getattr(s, "sections", []) or [])
+                                               + bound.get(s.id, []))),
+                        "steps": len(getattr(s, "steps", []) or []),
+                        "extract": sorted((getattr(s, "extract", {}) or {}).keys()),
+                        "elements": len(getattr(s, "elements", []) or []),
+                        "url": (routes.get(s.id) or {}).get("url", ""),
+                        "captured": s.id in seen,
+                        "labels": {k: len(v) for k, v in
+                                   (seen.get(s.id, {}).get("elements") or {}).items()},
+                    } for s in screens],
+                })
+
             if path == "/api/theme":
                 from ..theme import Theme, table
                 cur = Theme.load(st.root)
@@ -832,6 +865,9 @@ class Handler(BaseHTTPRequestHandler):
                     "model": assist.DEFAULT_MODEL,
                     "gateway": assist.LITELLM_BASE,
                     "key_helper": assist.LITELLM_KEY_HELPER,
+                    # never the key itself, only whether there is one
+                    "has_key": bool(assist.stored_api_key()),
+                    "models": assist.KNOWN_MODELS,
                     "backends": assist.backends(),
                     "house_rules": (assist.house_rules_path(st.root).read_text(encoding="utf-8")
                                     if assist.house_rules_are_custom(st.root)
@@ -1184,6 +1220,9 @@ class Handler(BaseHTTPRequestHandler):
                     text = rewrite_block(text, "assist", values)
                     from ..atomic import write_text as _wt
                     _wt(cfg, text)
+                if "api_key" in d:
+                    if not assist.set_api_key(str(d["api_key"] or "")):
+                        return self.fail("the key could not be saved to the keychain")
                 if "house_rules" in d:
                     body = str(d["house_rules"] or "").strip()
                     hp = assist.house_rules_path(st.root)

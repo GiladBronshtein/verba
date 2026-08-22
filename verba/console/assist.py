@@ -114,6 +114,43 @@ class AssistResult:
     backend: str = ""
 
 
+# The key a person pasted into the console, kept in the OS keychain and never
+# in a file, a log or this repository. Same mechanism the crawl passwords use.
+KEYCHAIN_SERVICE = "verba-api-key"
+
+# Offered as a list so nobody has to know an id by heart. Free text still works,
+# because a list in a released tool is out of date the week after it ships.
+KNOWN_MODELS = [
+    {"id": "claude-sonnet-5", "label": "Claude Sonnet 5",
+     "why": "The default. Fast, and good at following house rules."},
+    {"id": "claude-opus-5", "label": "Claude Opus 5",
+     "why": "Slower and stronger. Worth it for a first draft of a hard section."},
+    {"id": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5",
+     "why": "Quickest and cheapest. Fine for filling in short descriptions."},
+]
+
+
+def stored_api_key() -> str | None:
+    import subprocess
+    r = subprocess.run(["security", "find-generic-password",
+                        "-s", KEYCHAIN_SERVICE, "-w"],
+                       capture_output=True, text=True)
+    return (r.stdout.strip() or None) if r.returncode == 0 else None
+
+
+def set_api_key(key: str) -> bool:
+    """Save, or clear when given nothing."""
+    import subprocess
+    if not key.strip():
+        subprocess.run(["security", "delete-generic-password",
+                        "-s", KEYCHAIN_SERVICE], capture_output=True)
+        return True
+    r = subprocess.run(["security", "add-generic-password", "-U",
+                        "-s", KEYCHAIN_SERVICE, "-a", "verba", "-w", key.strip()],
+                       capture_output=True, text=True)
+    return r.returncode == 0
+
+
 def gateway_key() -> str | None:
     """The gateway key, printed on demand by a helper script.
 
@@ -165,13 +202,17 @@ def backends() -> list[dict]:
     else:
         note = f"{host}, key from the keychain, model {DEFAULT_MODEL}"
         ready = True
-    out.append({"id": "litellm", "label": f"Rise AI Hub ({DEFAULT_MODEL})",
-                "ready": ready, "note": note})
+    if LITELLM_BASE:
+        out.append({"id": "litellm", "label": "Your organisation's AI service",
+                    "ready": ready, "note": note})
 
-    if os.environ.get("ANTHROPIC_API_KEY") and sdk:
-        out.append({"id": "api", "label": "Anthropic API direct", "ready": True,
-                    "note": "ANTHROPIC_API_KEY is set. The gateway is preferred so "
-                            "usage stays metered centrally."})
+    key = os.environ.get("ANTHROPIC_API_KEY") or stored_api_key()
+    if sdk:
+        out.append({
+            "id": "api", "label": "Your own Claude key",
+            "ready": bool(key),
+            "note": ("saved on this machine, in the login keychain" if key
+                     else "no key saved yet")})
 
     exe = os.environ.get("VERBA_CLAUDE", "claude")
     path = shutil.which(exe)
@@ -208,8 +249,8 @@ def inside_claude_code() -> bool:
 def available() -> tuple[bool, str]:
     ready = [b for b in backends() if b["ready"]]
     if not ready:
-        return False, ("no way to reach a model. Set ANTHROPIC_API_KEY, or install "
-                       "the Claude Code CLI.")
+        return False, ("the writer has no way to reach a model yet. Add a Claude "
+                       "key under Set up, The writer.")
     return True, ready[0]["id"]
 
 
@@ -271,7 +312,9 @@ def _run_litellm(prompt: str, system: str, timeout: int) -> AssistResult:
 
 def _run_api(prompt: str, system: str, timeout: int) -> AssistResult:
     import anthropic
-    client = anthropic.Anthropic(timeout=timeout)
+    key = os.environ.get("ANTHROPIC_API_KEY") or stored_api_key()
+    client = anthropic.Anthropic(api_key=key, timeout=timeout) if key \
+        else anthropic.Anthropic(timeout=timeout)
     return _call_messages(client, system, prompt, "api")
 
 

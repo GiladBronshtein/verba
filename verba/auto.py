@@ -123,6 +123,8 @@ class Auto:
             self._step("fix the writing", self._tidy, emit)
             self._step("apply the differences", self._drift, emit)
             self._step("use the pictures the crawl took", self._images, emit)
+            self._step("replace pictures nobody has checked",
+                       self._replace_unchecked_pictures, emit)
             self._step("rewrite what the rules object to", self._polish, emit)
 
             # Not "the rules are clean": a document can break no rules and still
@@ -519,6 +521,50 @@ class Auto:
                     if sid in merged.get("screens", {})}
         except Exception:
             return {}
+
+    def _replace_unchecked_pictures(self, emit) -> str:
+        """Swap in a freshly masked photograph wherever one is available.
+
+        A picture that never went through masking is reported by name, and the
+        crawl that just ran almost certainly took a masked version of the very
+        same screen. Waiting for the sweep to notice a difference was too
+        indirect: it compares fingerprints and proposes a swap when a screen has
+        visibly moved, which is not the question here. The question is whether
+        anybody has checked this picture, and the answer is known.
+        """
+        from .capture import latest_capture
+        from .console import actions
+        from .history import History
+        from .lint import lint
+
+        run = latest_capture(self.root / "capture")
+        if run is None:
+            return ""
+        wanted = [f.message.split(":", 1)[-1].strip()
+                  for f in lint(self._project())
+                  if f.rule == "ASSET-10" and ":" in f.message]
+        if not wanted:
+            return ""
+        swapped = 0
+        for name in wanted:
+            src = run / "screenshots" / name
+            if not src.exists():
+                continue                       # this screen was not in the run
+            p = self._project()
+            before = p.asset_path(name).read_bytes() if p.assets.exists(name) else b""
+            try:
+                actions.apply_image(p, run, name)
+            except Exception as e:
+                emit(f"      could not replace {name}: {e}")
+                continue
+            after = p.asset_path(name).read_bytes()
+            if after != before:
+                History(self.root).record(
+                    name, p.asset_path(name), "", "", actor="auto",
+                    action="picture", note=f"replaced {name} with a masked capture")
+                swapped += 1
+                emit(f"      replaced {name} with a masked photograph")
+        return f"{swapped} picture(s) replaced" if swapped else ""
 
     def _images(self, emit) -> str:
         from .decisions import Decisions

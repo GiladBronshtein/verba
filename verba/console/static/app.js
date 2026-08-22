@@ -324,6 +324,7 @@ const STAGES = [
    the record of every change. */
 const LOOK = [
   ['document', 'Document', 'document'],
+  ['screens',  'Screens',  'overview'],
   ['images',   'Images',   'camera'],
   ['fields',   'Fields',   'form'],
   ['history',  'History',  'history'],
@@ -628,6 +629,7 @@ function render() {
   if (view === 'editions') return drawEditions(m);
   if (view === 'documents') return drawDocuments(m);
   if (view === 'assistant') return drawAssistant(m);
+  if (view === 'screens') return drawScreens(m);
   if (view === 'fields') return drawFields(m);
   if (view === 'findings') return drawFindings(m);
   if (view === 'section') return drawSection(m);
@@ -1348,6 +1350,86 @@ async function drawFields(m) {
   }
 }
 
+/* --------------------------------------------------------------- screens */
+/* What gets photographed, and what is read off each one.
+
+   This is the heart of the system and it was a YAML file you edited by hand.
+   Every difference in Review, every label in Fields and every picture in the
+   document comes from here, and there was no way to see it: to answer "is that
+   screen even being crawled?" you opened a file. Nothing here writes the
+   registry, because a selector is a real decision and the healing flow already
+   proposes those with evidence. This is the reading half, which was missing
+   entirely. */
+async function drawScreens(m) {
+  m.innerHTML = '';
+  m.append(el('h2', 'page', 'Screens'));
+
+  let d;
+  try { d = await api('/api/screens'); }
+  catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
+
+  m.append(el('div', 'muted',
+    `Every screen a crawl visits, at ${esc(d.base_url || 'the connected system')}. ` +
+    `Edited in ${esc(d.path)}.` + hint(
+      'A screen says how to reach itself and what to read off it. The labels it ' +
+      'reads are what Review compares the document against, so a screen that ' +
+      'reads nothing can never tell you the product changed.')));
+
+  const orphan = d.screens.filter(s => !s.sections.length);
+  const mute = d.screens.filter(s => s.sections.length && !s.extract.length);
+  if (orphan.length || mute.length) {
+    const w = el('div', 'panel warn-edge');
+    w.append(el('h3', null, 'Worth knowing'));
+    if (orphan.length) {
+      w.append(el('div', null,
+        `<b>${orphan.length}</b> screen(s) are crawled but no section shows them: ` +
+        orphan.map(s => `<code>${esc(s.id)}</code>`).join(' ')));
+    }
+    if (mute.length) {
+      w.append(el('div', null,
+        `<b>${mute.length}</b> screen(s) are photographed but read nothing, so they ` +
+        `cannot report a change: ` +
+        mute.map(s => `<code>${esc(s.id)}</code>`).join(' ')));
+    }
+    m.append(w);
+  }
+
+  const panel = el('div', 'panel'); panel.style.padding = '0';
+  const tb = el('table', null,
+    '<thead><tr><th>Screen</th><th>Shown in</th><th>Reads</th>' +
+    '<th>How it is reached</th><th>Last capture</th></tr></thead>');
+  const body = el('tbody');
+  d.screens.forEach(s => {
+    const reads = s.extract.length
+      ? s.extract.map(k => {
+          const n = (s.labels || {})[k];
+          return `<span class="tag">${esc(k)}${n ? ' ' + n : ''}</span>`;
+        }).join(' ')
+      : '<span class="muted">nothing</span>';
+    const shown = s.sections.length
+      ? s.sections.map(x => `<code>${esc(x)}</code>`).join('<br>')
+      : '<span class="muted">no section</span>';
+    const how = s.url
+      ? `<span class="muted">straight to a remembered address</span>`
+      : `<span class="muted">${s.steps} step(s)</span>`;
+    const row = el('tr', null,
+      `<td><b>${esc(s.title)}</b><div class="mono muted">${esc(s.id)}</div></td>
+       <td>${shown}</td><td>${reads}</td><td>${how}</td>
+       <td>${s.captured ? 'yes' : '<span class="muted">never</span>'}</td>`);
+    body.append(row);
+  });
+  tb.append(body); panel.append(tb); m.append(panel);
+
+  const bar = el('div', 'row'); bar.style.margin = '16px 0 26px';
+  const go = el('button', 'act primary', icon('camera') + 'Photograph every screen');
+  go.onclick = () => runCapture(null);
+  const heal = el('button', 'act', icon('alert') + 'Review selector repairs');
+  heal.title = 'What the healer proposed when a selector stopped resolving';
+  heal.onclick = () => setView('capture');
+  bar.append(go, heal);
+  m.append(bar);
+}
+
 /* ------------------------------------------------------------- assistant */
 /* Which model does the writing, how it is reached, and the rules it writes by.
 
@@ -1362,99 +1444,174 @@ async function drawAssistant(m) {
   m.innerHTML = '';
   m.append(el('h2', 'page', 'The writer'));
   m.append(el('div', 'muted',
-    'Which model does the writing, how it is reached, and the rules it writes by.'));
+    'Verba can draft and tidy sections for you. It needs a key to do that, ' +
+    'and it never writes anything without showing you first.'));
 
   let d;
   try { d = await api('/api/assistant'); }
   catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
 
-  // what is actually reachable right now, in preference order
-  const reach = el('div', 'panel');
-  reach.append(el('h3', null, 'How the model is reached'));
-  reach.append(el('div', 'muted',
-    'Tried in this order. The first that answers is used.'));
+  const uid = 'as' + Math.random().toString(36).slice(2, 6);
+  const ready = d.backends.filter(b => b.ready);
+
+  // Where it stands, in one sentence, before any settings at all.
+  const state = el('div', 'panel ' + (ready.length ? 'ok-edge' : 'warn-edge'));
+  state.append(el('div', 'bigstate', ready.length
+    ? `Ready, using ${esc(ready[0].label)}.`
+    : 'Not set up yet. Add a key below and the writer starts working.'));
+  if (ready.length) {
+    state.append(el('div', 'muted',
+      'Everything else on this page is optional.'));
+  }
+  m.append(state);
+
+  // The one thing most people need.
+  const keyp = el('div', 'panel');
+  keyp.append(el('h3', null, 'Your Claude key'));
+  keyp.append(el('div', 'muted',
+    d.has_key
+      ? 'A key is saved on this machine, in the login keychain. It is never ' +
+        'written into this project or shown again.'
+      : 'Paste a key from console.anthropic.com. It is saved on this machine, ' +
+        'in the login keychain, never into this project and never into a log.'));
+  const kf = el('div', 'field'); kf.style.maxWidth = '520px'; kf.style.marginTop = '12px';
+  kf.innerHTML = `<label for="${uid}key">Key</label>
+    <input id="${uid}key" type="password" autocomplete="off"
+      placeholder="${d.has_key ? '\u2022'.repeat(24) + '  (saved)' : 'sk-ant-...'}">
+    <div class="help">Leave blank to keep the one you have.</div>`;
+  keyp.append(kf);
+  const krow = el('div', 'row');
+  const ksave = el('button', 'act primary', icon('check') + 'Save the key');
+  ksave.onclick = async () => {
+    const v = document.getElementById(uid + 'key').value;
+    if (!v.trim()) return toast('Nothing to save', true);
+    ksave.disabled = true;
+    try {
+      await api('/api/assistant/set', { method: 'POST', json: { api_key: v } });
+      toast('Key saved on this machine');
+      drawAssistant(holder());
+    } catch (e) { toast(e.message, true); ksave.disabled = false; }
+  };
+  krow.append(ksave);
+  if (d.has_key) {
+    const drop = el('button', 'act ghost', 'Forget it');
+    drop.onclick = async () => {
+      if (!await modal({ title: 'Forget the saved key?',
+        body: '<p>It is removed from this machine\u2019s keychain. The writer ' +
+              'stops working until another is added.</p>',
+        confirmLabel: 'Forget it', confirmClass: 'danger' })) return;
+      await api('/api/assistant/set', { method: 'POST', json: { api_key: '' } });
+      toast('Key forgotten');
+      drawAssistant(holder());
+    };
+    krow.append(drop);
+  }
+  keyp.append(krow);
+  m.append(keyp);
+
+  // Which model, chosen by what it is good at rather than by its id.
+  const mp = el('div', 'panel');
+  mp.append(el('h3', null, 'Which model does the writing'));
+  const grid = el('div', 'models');
+  const known = d.models.some(x => x.id === d.model);
+  d.models.forEach(mo => {
+    const card = el('button', 'model' + (mo.id === d.model ? ' on' : ''));
+    card.innerHTML = `<div class="mname">${esc(mo.label)}${mo.id === d.model ? ' \u2713' : ''}</div>
+      <div class="mwhy">${esc(mo.why)}</div>`;
+    card.disabled = mo.id === d.model;
+    card.onclick = async () => {
+      await api('/api/assistant/set', { method: 'POST', json: { model: mo.id } });
+      toast(`Now writing with ${mo.label}`);
+      drawAssistant(holder());
+    };
+    grid.append(card);
+  });
+  mp.append(grid);
+  if (!known && d.model) {
+    mp.append(el('div', 'muted',
+      `Currently set to <code>${esc(d.model)}</code>, which is not one of these. ` +
+      `That is fine: it is passed through exactly as written.`));
+  }
+  m.append(mp);
+
+  // Everything an ordinary person never has to see.
+  const adv = el('details', 'advanced');
+  adv.append(el('summary', null, 'If your company runs its own AI service'));
+  const inner = el('div', 'pad');
+  inner.append(el('div', 'muted',
+    'Some organisations route all AI usage through one internal address so it ' +
+    'can be paid for and audited centrally. If yours does, whoever set it up ' +
+    'will give you these two. Otherwise ignore this.'));
+  const g = el('div', 'grid2'); g.style.marginTop = '12px';
+  g.innerHTML = `
+    <div class="field"><label for="${uid}g">Address of the service</label>
+      <input id="${uid}g" value="${esc(d.gateway || '')}"
+        placeholder="https://ai.yourcompany.com"></div>
+    <div class="field"><label for="${uid}k">Script that supplies the key</label>
+      <input id="${uid}k" value="${esc(d.key_helper || '')}"
+        placeholder="~/.config/ai-key.sh">
+      <div class="help">Only if they gave you one instead of a key.</div></div>
+    <div class="field" style="grid-column:1/-1">
+      <label for="${uid}m">Model name, exactly as your service knows it</label>
+      <input id="${uid}m" value="${esc(d.model || '')}" placeholder="claude-sonnet-5"></div>`;
+  inner.append(g);
+  const arow = el('div', 'row');
+  const asave = el('button', 'act', icon('check') + 'Save these');
+  asave.onclick = async () => {
+    const v = (k) => (document.getElementById(uid + k).value || '').trim();
+    try {
+      const r = await api('/api/assistant/set', { method: 'POST', json: {
+        gateway: v('g'), key_helper: v('k'), model: v('m') } });
+      toast(r.message);
+      if (r.restart_hint) toast('Reload the console for this to take effect', true);
+      drawAssistant(holder());
+    } catch (e) { toast(e.message, true); }
+  };
+  arow.append(asave); inner.append(arow);
+  adv.append(inner);
+  m.append(adv);
+
+  // How it is reached, as a fact rather than a setting.
+  const reach = el('details', 'advanced');
+  reach.append(el('summary', null, 'How the writer is reaching a model'));
+  const rin = el('div', 'pad');
+  rin.append(el('div', 'muted', 'Tried in this order. The first that answers is used.'));
   d.backends.forEach(b => {
     const row = el('div', 'backend' + (b.ready ? ' on' : ''));
-    row.innerHTML =
-      `<span class="bmark">${b.ready ? '&#10003;' : '&#8212;'}</span>` +
+    row.innerHTML = `<span class="bmark">${b.ready ? '&#10003;' : '&#8212;'}</span>` +
       `<span class="bbody"><b>${esc(b.label)}</b>` +
       `<span class="bnote">${esc(b.note || '')}</span></span>`;
-    reach.append(row);
+    rin.append(row);
   });
+  reach.append(rin);
   m.append(reach);
 
-  const uid = 'as' + Math.random().toString(36).slice(2, 6);
-  const cfg = el('div', 'panel');
-  cfg.append(el('h3', null, 'Where to send the writing'));
-  const g = el('div', 'grid2'); g.style.marginTop = '10px';
-  g.innerHTML = `
-    <div class="field"><label for="${uid}m">Model</label>
-      <input id="${uid}m" value="${esc(d.model || '')}" placeholder="claude-sonnet-5">
-      <div class="help">The id your gateway or provider knows this model by.</div></div>
-    <div class="field"><label for="${uid}g">Gateway <small>optional</small></label>
-      <input id="${uid}g" value="${esc(d.gateway || '')}" placeholder="https://gateway.example.com">
-      <div class="help">Leave empty to talk to Anthropic directly, or to use the
-        Claude Code CLI.</div></div>
-    <div class="field" style="grid-column:1/-1">
-      <label for="${uid}k">Key helper <small>optional</small></label>
-      <input id="${uid}k" value="${esc(d.key_helper || '')}" placeholder="~/.config/gateway-key.sh">
-      <div class="help">A script that prints the key. No key is ever stored in
-        this project or written to a log.</div></div>`;
-  cfg.append(g);
-  m.append(cfg);
-
-  m.append(el('div', 'muted',
-    'This talks the Anthropic Messages API. Claude works directly. Anything ' +
-    'else needs a gateway that speaks it on the model\u2019s behalf, which is ' +
-    'what LiteLLM and similar proxies do.' + hint(
-      'The model id is passed through untouched, so whether another provider ' +
-      'works is entirely a question about your gateway. Nothing here has been ' +
-      'tested against one, so treat it as yours to verify.')));
-
-  const rules = el('div', 'panel');
-  rules.append(el('h3', null, 'The rules it writes by'));
-  rules.append(el('div', 'muted',
+  // The rules, last, because most people never change them.
+  const rules = el('details', 'advanced');
+  rules.append(el('summary', null, 'The rules it writes by'));
+  const rr = el('div', 'pad');
+  rr.append(el('div', 'muted',
     d.house_is_custom
-      ? `Your own, kept in ${esc(d.house_path)}.`
-      : 'The built-in set. Edit it and it becomes yours, kept in ' +
-        `${esc(d.house_path)}. Empty it to go back to this.`));
+      ? 'Your own. Empty the box and save to go back to the built-in set.'
+      : 'The built-in set: no em dashes, no web addresses in the text, bullets ' +
+        'for lists, never invent a fact. Edit it and it becomes yours.'));
   const ta = el('textarea', 'houserules');
   ta.value = d.house_rules || '';
   ta.spellcheck = false;
   ta.setAttribute('aria-label', 'House writing rules');
-  rules.append(ta);
-  m.append(rules);
-
-  const bar = el('div', 'row'); bar.style.margin = '4px 0 24px';
-  const save = el('button', 'act primary', icon('check') + 'Save');
-  save.onclick = async () => {
-    const v = (k) => (document.getElementById(uid + k).value || '').trim();
-    save.disabled = true;
+  rr.append(ta);
+  const rrow = el('div', 'row');
+  const rsave = el('button', 'act', icon('check') + 'Save the rules');
+  rsave.onclick = async () => {
     try {
-      const r = await api('/api/assistant/set', { method: 'POST', json: {
-        model: v('m'), gateway: v('g'), key_helper: v('k'),
-        house_rules: ta.value } });
-      toast(r.message);
-      if (r.restart_hint) {
-        toast('Reload the console for a new gateway to take effect', true);
-      }
+      await api('/api/assistant/set', { method: 'POST', json: { house_rules: ta.value } });
+      toast('Rules saved');
       drawAssistant(holder());
-    } catch (e) { toast(e.message, true); save.disabled = false; }
+    } catch (e) { toast(e.message, true); }
   };
-  const reset = el('button', 'act ghost', 'Back to the built-in rules');
-  reset.onclick = async () => {
-    if (!await modal({
-      title: 'Use the built-in writing rules?',
-      body: '<p>Your own rules are deleted and the built-in set takes over. ' +
-            'Nothing already written changes.</p>',
-      confirmLabel: 'Use the built-in set' })) return;
-    await api('/api/assistant/set', { method: 'POST', json: { house_rules: '' } });
-    toast('back to the built-in rules');
-    drawAssistant(holder());
-  };
-  bar.append(save);
-  if (d.house_is_custom) bar.append(reset);
-  m.append(bar);
+  rrow.append(rsave); rr.append(rrow);
+  rules.append(rr);
+  m.append(rules);
 }
 
 /* ------------------------------------------------------------- documents */

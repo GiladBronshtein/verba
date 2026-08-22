@@ -16,7 +16,8 @@ not by being careful.
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-3137DB)](LICENSE)
-[![Tests](https://img.shields.io/badge/selftests-13%2F13-1F9D55)](tools/selftest.py)
+[![check](https://github.com/GiladBronshtein/verba/actions/workflows/check.yml/badge.svg)](https://github.com/GiladBronshtein/verba/actions/workflows/check.yml)
+[![Tests](https://img.shields.io/badge/selftests-18%2F18-1F9D55)](tools/selftest.py)
 [![Read only](https://img.shields.io/badge/writes%20to%20your%20system-never-1F9D55)](#nothing-is-ever-written-to-the-system-you-document)
 
 </div>
@@ -443,6 +444,11 @@ python3 tools/selftest.py
 The suite builds a project from scratch with the wizard and tests the engine
 against that, rather than against a hand-made fixture. An engine whose whole
 claim is that it works on a product it has never seen should be tested that way.
+
+It runs on every push, with a browser, against the demo document. The first
+three things it found were that the package did not build, that `numpy` was
+imported and never declared, and that a duplicate dictionary key had been
+silently discarding a section's own note.
 
 ## License
 

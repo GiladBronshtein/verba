@@ -991,3 +991,36 @@ label:has(> input[type="checkbox"]) {
   background:var(--surface);color:var(--text);
   border:1px solid var(--line);border-radius:8px;resize:vertical}
 .houserules:focus{outline:2px solid var(--brand-lift);outline-offset:-1px}
+
+/* a small label with an optional count, for what a screen reads */
+.tag{display:inline-block;padding:2px 7px;margin:1px 0;border-radius:5px;
+  background:var(--surface);border:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--text-2)}
+
+/* a small label with an optional count, for what a screen reads */
+.tag{display:inline-block;padding:2px 7px;margin:1px 0;border-radius:5px;
+  background:var(--surface);border:1px solid var(--line);
+  font-family:var(--mono);font-size:12px;color:var(--text-2)}
+
+/* the writer: state first, settings after, jargon folded away */
+.bigstate{font-size:15px;font-weight:600;line-height:1.4}
+.panel.ok-edge{border-left:3px solid var(--ok)}
+.models{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  gap:11px;margin-top:12px}
+.model{text-align:left;padding:13px;border:1px solid var(--line);border-radius:9px;
+  background:var(--surface);color:inherit;font:inherit;cursor:pointer;
+  transition:border-color var(--fast),background var(--fast)}
+.model:hover:not(:disabled){border-color:var(--brand-lift)}
+.model.on{border-color:var(--brand-lift);background:var(--brand-soft);cursor:default}
+.mname{font-size:13.5px;font-weight:600}
+.mwhy{font-size:12px;color:var(--text-3);margin-top:4px;line-height:1.45}
+details.advanced{border:1px solid var(--line);border-radius:9px;
+  background:var(--panel);margin:14px 0}
+details.advanced > summary{padding:13px 16px;cursor:pointer;font-size:13.5px;
+  font-weight:550;list-style:none;display:flex;align-items:center;gap:8px}
+details.advanced > summary::-webkit-details-marker{display:none}
+details.advanced > summary::before{content:"\25B8";color:var(--text-3);
+  transition:transform var(--fast)}
+details.advanced[open] > summary::before{transform:rotate(90deg)}
+details.advanced > summary:hover{color:var(--text)}
+details.advanced .pad{padding:0 16px 16px}
