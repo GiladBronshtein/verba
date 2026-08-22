@@ -599,6 +599,90 @@ def read_verdict(text: str) -> tuple[bool, list[str]]:
     return False, []
 
 
+DECIDE_SYSTEM = """You are the editor of a product's documentation, deciding what
+to do about a finding that no automatic step could clear.
+
+You get the finding, and the sections involved with their figures. Choose ONE
+action and give one sentence of reasoning. Answer in exactly this shape:
+
+ACTION: drop_figure
+SECTION: the.section.id
+FILE: the-file.png
+WHY: one sentence
+
+or
+
+ACTION: accept
+FILE: the-file.png
+WHY: one sentence
+
+or
+
+ACTION: none
+WHY: one sentence saying what a person has to decide and why you cannot
+
+What the actions mean:
+
+drop_figure removes one figure from one section. The text stays. Use it when a
+figure does not illustrate the section it sits in, when two sections show the
+same picture and only one of them is about it, or when a picture cannot be
+published and cannot be replaced.
+
+accept records that the picture is fine after all. Use it only for a false
+alarm, never to make a finding go away.
+
+none is for a decision that genuinely belongs to a person.
+
+Rules you are held to:
+
+A picture showing a real customer's name cannot be published in an edition that
+names no customer. If it cannot be re-photographed, it has to come out: a
+missing figure is a smaller loss than one customer's account appearing in
+another customer's manual.
+
+Prefer the section the picture is actually about. A screenshot of a whole
+dashboard belongs in the section about the dashboard, not in the one about the
+sidebar down its left side.
+
+Never drop the only figure a section has if the picture genuinely illustrates
+it and nothing is wrong with it."""
+
+
+def decide(finding: dict, sections: list[dict], edition: str = "",
+           timeout: int = 90) -> AssistResult:
+    """Ask for a decision on a finding nothing mechanical could settle."""
+    lines = [f"Edition being built: {edition or 'the default one'}", "",
+             f"Finding: {finding.get('rule', '')} {finding.get('message', '')}",
+             f"Detail: {finding.get('detail', '')}", ""]
+    for s in sections:
+        lines.append(f"Section {s['id']}  —  {s.get('title', '')}")
+        for fig in s.get("figures", []):
+            lines.append(f"    figure: {fig}")
+        body = (s.get("body") or "").strip()
+        if body:
+            lines.append("    text: " + body[:400].replace("\n", " "))
+        lines.append("")
+
+    ok_, why = available()
+    if not ok_:
+        return AssistResult(False, error=why)
+    return run_model("\n".join(lines), system=DECIDE_SYSTEM, timeout=timeout)
+
+
+def read_decision(text: str) -> dict:
+    out = {"action": "none", "section": "", "file": "", "why": ""}
+    for line in (text or "").splitlines():
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip().lower()
+        if key in out:
+            out[key] = value.strip()
+    if out["action"] not in ("drop_figure", "accept", "none"):
+        out["action"] = "none"
+    return out
+
+
 def build_prompt(task: str, project, section, inventory, drift, findings,
                  notes: str = "") -> str:
     evidence = _evidence(project, section, inventory, drift)

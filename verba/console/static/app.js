@@ -258,6 +258,15 @@ async function refresh() {
 
    `state(S)` returns the one line under a step, and the tone that colours its
    mark. Tone never carries meaning alone: the line says the same thing. */
+/* What each state looks like. Never a number: see drawNav. */
+const STEP_MARK = {
+  done:      '&#10003;',        // a tick
+  ready:     '&#9679;',         // a filled dot: nothing outstanding, go when you like
+  attention: '&#8226;',         // a smaller dot
+  blocked:   '&#33;',           // an exclamation
+  todo:      '',                // nothing yet
+};
+
 const STAGES = [
   {
     id: 'connections', n: 1, label: 'Connect', icon: 'connections',
@@ -424,7 +433,13 @@ function drawNav() {
     b.dataset.v = st.id;
     b.setAttribute('aria-current', view === st.id ? 'page' : 'false');
     b.innerHTML =
-      `<span class="stepn ${s.tone}">${s.tone === 'done' ? '&#10003;' : st.n}</span>` +
+      // The mark says how the step stands. It must not say a number, because a
+      // number in a coloured circle beside a label is a count everywhere else
+      // in software: "Check 5" was read as five findings when it meant step
+      // five, and the page beside it said four. The ordinal is still there,
+      // small and plain, where it reads as an ordinal.
+      `<span class="stepn ${s.tone}">${STEP_MARK[s.tone] || ''}</span>` +
+      `<span class="stepord">${st.n}</span>` +
       `<span class="stepbody"><span class="stept">${esc(st.label)}</span>` +
       `<span class="steps">${esc(s.line)}</span></span>`;
     if (st.id === here) b.append(el('span', 'younow', 'now'));

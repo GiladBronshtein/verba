@@ -90,6 +90,23 @@ class Step:
         return {**self.__dict__, "better": self.better}
 
 
+def _drop_figure(text: str, filename: str) -> str:
+    """Remove one figure line, and the blank line it leaves behind."""
+    out, skipped = [], False
+    for line in text.splitlines(keepends=True):
+        if not skipped and line.lstrip().startswith("![") and filename in line:
+            skipped = True
+            continue
+        out.append(line)
+    if not skipped:
+        return text
+    # collapse the double blank a removed line leaves
+    joined = "".join(out)
+    while "\n\n\n" in joined:
+        joined = joined.replace("\n\n\n", "\n\n")
+    return joined
+
+
 @dataclass
 class Auto:
     root: Path
@@ -127,6 +144,8 @@ class Auto:
                        self._replace_unchecked_pictures, emit)
             self._step("look at the pictures nobody has checked",
                        self._look_at_pictures, emit)
+            self._step("decide what nothing else could settle",
+                       self._settle_the_rest, emit)
             self._step("rewrite what the rules object to", self._polish, emit)
 
             # Not "the rules are clean": a document can break no rules and still
@@ -523,6 +542,99 @@ class Auto:
                     if sid in merged.get("screens", {})}
         except Exception:
             return {}
+
+    def _settle_the_rest(self, emit) -> str:
+        """Decide the findings no mechanical step could clear.
+
+        Everything before this either applies a difference, adopts a picture or
+        rewrites a sentence, and each of those is a change with an obviously
+        right answer. What is left is the residue: two sections showing one
+        picture, a photograph carrying a name that cannot be re-photographed.
+        Those need an editor's judgement, which is why they were handed back.
+
+        Handing them back is right when there is nobody to hand them to and
+        wrong when there is. There is: the same model doing the writing can read
+        both sections and say which one the picture is actually about. It gets a
+        closed menu of actions rather than free rein, its reasoning is recorded
+        beside the change, and the whole step is measured and put back if the
+        rules got worse. A person who disagrees restores it from History.
+        """
+        from .console import assist
+        from .history import History
+        from .lint import lint
+
+        proj = self._project()
+        left = [f for f in lint(proj) if f.level in ("error", "warning")]
+        if not left:
+            return ""
+
+        ok, why = assist.available()
+        if not ok:
+            self._describe_blocked = why
+            return ""
+
+        def figures_of(sec):
+            return [b.attrs.get("file", "") for b in sec.blocks
+                    if b.kind == "screenshot" and b.attrs.get("file")]
+
+        done = 0
+        for f in left:
+            # every section this finding touches, by id, from wherever it names them
+            blob = f"{f.section} {f.detail or ''} {f.message}"
+            involved = [s for sid, s in proj.sections.items() if sid in blob]
+            if not involved:
+                continue
+            payload = [{
+                "id": s.id, "title": s.title, "figures": figures_of(s),
+                "body": " ".join(b.text for b in s.blocks if b.kind == "paragraph"),
+            } for s in involved]
+
+            res = assist.decide(
+                {"rule": f.rule, "message": f.message, "detail": f.detail or ""},
+                payload, edition=proj.profile.name)
+            if not res.ok:
+                self._describe_blocked = (res.error or "")[:120]
+                emit(f"      could not decide {f.rule}: {res.error}")
+                break
+
+            d = assist.read_decision(res.output)
+            if d["action"] == "none":
+                emit(f"      {f.rule}: left for a person. {d['why'][:90]}")
+                self.for_you.append({
+                    "what": f.message, "why": d["why"] or (f.detail or ""),
+                    "do": "Open the section and decide."})
+                continue
+
+            if d["action"] == "accept":
+                name = d["file"]
+                if proj.assets.exists(name):
+                    entry = proj.assets.registry.setdefault(name, {})
+                    entry["checked_by"] = {
+                        "who": f"the model ({assist.DEFAULT_MODEL})",
+                        "when": datetime.now().strftime("%Y-%m-%d"),
+                        "note": d["why"][:200]}
+                    proj.assets.save()
+                    done += 1
+                    emit(f"      kept {name}: {d['why'][:80]}")
+                continue
+
+            sec = proj.sections.get(d["section"])
+            if sec is None or not d["file"]:
+                continue
+            before = sec.path.read_text(encoding="utf-8")
+            after = _drop_figure(before, d["file"])
+            if after == before:
+                continue
+            sec.path.write_text(after, encoding="utf-8")
+            History(self.root).record(
+                sec.id, sec.path, before, after, actor="auto", action="decide",
+                note=f"took {d['file']} out of {sec.id}: {d['why'][:120]}")
+            emit(f"      took {d['file']} out of {sec.id}")
+            emit(f"        because {d['why'][:100]}")
+            done += 1
+            proj = self._project()
+
+        return f"{done} decision(s) made" if done else ""
 
     def _look_at_pictures(self, emit) -> str:
         """Have the model look at every picture nobody has checked.
