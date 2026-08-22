@@ -53,7 +53,7 @@ wins here.
 Things a screenshot cannot show. Inheritance, precedence, what happens when two
 settings disagree, which fields are required and why.
 
-- 
+- …
 
 ## Do not document
 

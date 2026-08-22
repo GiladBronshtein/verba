@@ -147,8 +147,8 @@ class Tidy:
 
     # ------------------------------------------------------------------
     def _decide(self, sec, node, bad: list[str], emit) -> list[tuple]:
-        from .console import assist
         from .capture import merged_inventory
+        from .console import assist
 
         good = [f"  - {n}" for n in _good_names(sec)]
         badlines = []

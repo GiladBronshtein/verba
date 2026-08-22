@@ -16,12 +16,13 @@ that quietly forgets is worse than no list.
 """
 from __future__ import annotations
 
-from .atomic import write_json
 import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from .atomic import write_json
 
 STORE = "review/notes.json"
 

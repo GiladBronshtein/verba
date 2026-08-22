@@ -10,8 +10,16 @@ import yaml
 from jinja2 import Environment, StrictUndefined, TemplateError
 
 from .assets import AssetStore
-from .model import (Block, Node, Section, build_outline, flatten,
-                    load_all_sections, outline_ids, prune_outline)
+from .model import (
+    Block,
+    Node,
+    Section,
+    build_outline,
+    flatten,
+    load_all_sections,
+    outline_ids,
+    prune_outline,
+)
 
 CONTENT_DIR = "content"
 

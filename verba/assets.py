@@ -8,7 +8,6 @@ uses the image, and a registry records where each one came from.
 from __future__ import annotations
 
 import hashlib
-from .atomic import write_json
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -16,6 +15,7 @@ from pathlib import Path
 
 from PIL import Image
 
+from .atomic import write_json
 from .imaging import auto_crop_image, distance, fingerprint
 
 

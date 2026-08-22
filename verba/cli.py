@@ -39,24 +39,24 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from .capture import (Capture, latest_capture, load_routes, load_screens,
-                      merged_inventory)
-from .healing import Healer, apply_repairs
-from .masking import Masker
-from .readonly import lint_screens
+from .capture import Capture, latest_capture, load_routes, load_screens, merged_inventory
+from .decisions import Decisions
 from .drift import analyse, to_markdown
 from .environments import Environments
-from .decisions import Decisions
+from .healing import Healer, apply_repairs
 from .history import History
 from .incidents import Incidents
 from .knowledge import Knowledge
-from .sweep import Sweep
 from .lint import ERROR, lint, summarise
+from .masking import Masker
 from .model import Block, Section
 from .project import Project
+from .readonly import lint_screens
 from .render.docx import DocxRenderer
 from .render.html import HtmlRenderer
+from .sweep import Sweep
 from .version import ReleaseStore, output_name
+
 
 def find_root(start: Path | None = None) -> Path:
     """The project you are standing in.
@@ -400,7 +400,7 @@ def cmd_masking(args):
 
 def cmd_note(args):
     """Write down something you noticed. The next run deals with it."""
-    from .notes import Notes, OPEN, FIXED, STUCK
+    from .notes import FIXED, OPEN, STUCK, Notes
     n = Notes.load(args.root)
 
     if args.text:
@@ -469,9 +469,9 @@ def cmd_auto(args):
 
 def cmd_tidy(args):
     """Fix the writing across the whole document, as one decision."""
-    from .tidy import Tidy
     from .history import History
     from .knowledge import Knowledge
+    from .tidy import Tidy
 
     p = _project(args)
     root = Path(args.root)

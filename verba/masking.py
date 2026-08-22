@@ -12,13 +12,14 @@ Screenshots therefore stay consistent between revisions.
 """
 from __future__ import annotations
 
-from .atomic import write_json
 import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+from .atomic import write_json
 
 # Applied in the browser. Returns the mapping it used so the caller can persist
 # it and reuse it next time.

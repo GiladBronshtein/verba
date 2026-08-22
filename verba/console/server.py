@@ -9,8 +9,8 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
-import re
 import os
+import re
 import shutil
 import subprocess
 import urllib.parse
@@ -18,10 +18,17 @@ from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from ..capture import (Capture, latest_capture, load_routes, load_screens,
-                       merged_inventory)
-from ..masking import Masker
-from ..readonly import lint_screens
+from .. import forms as formlib
+from .. import glyphs
+from ..assets import refresh_derived
+from ..capture import (
+    Capture,
+    _is_direct,
+    latest_capture,
+    load_routes,
+    load_screens,
+    merged_inventory,
+)
 from ..decisions import Decisions
 from ..drift import analyse, to_markdown
 from ..environments import Environment, Environments
@@ -29,19 +36,18 @@ from ..healing import Healer, apply_repairs
 from ..history import History
 from ..incidents import Incidents
 from ..knowledge import Knowledge
-from ..sweep import Sweep
-from ..typography import Typography
-from .. import forms as formlib
-from .. import glyphs
-from ..lint import lint, remedy as _lint_remedy, summarise
+from ..lint import lint, summarise
+from ..lint import remedy as _lint_remedy
+from ..masking import Masker
 from ..model import parse_section
 from ..project import Project
+from ..readonly import lint_screens
 from ..render.docx import DocxRenderer
 from ..render.html import HtmlRenderer
 from ..render.pdf import PdfRenderer
+from ..sweep import Sweep
+from ..typography import Typography
 from ..version import ReleaseStore, output_name
-from ..assets import refresh_derived
-from ..capture import _is_direct
 from . import actions, assist
 from .jobs import JobRunner
 
@@ -777,7 +783,8 @@ class Handler(BaseHTTPRequestHandler):
                 # Every finding, with what would clear it and the section it
                 # belongs to, so the interface can offer the fix rather than
                 # printing the problem and stopping there.
-                from ..lint import lint as _lint, remedy
+                from ..lint import lint as _lint
+                from ..lint import remedy
                 p = st.reload()
                 out = []
                 for f in _lint(p):
@@ -820,7 +827,7 @@ class Handler(BaseHTTPRequestHandler):
                 })
 
             if path == "/api/assistant":
-                from .. import console as _c   # noqa: F401
+                from .. import console as _c  # noqa: F401
                 return self.json({
                     "model": assist.DEFAULT_MODEL,
                     "gateway": assist.LITELLM_BASE,

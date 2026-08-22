@@ -11,8 +11,9 @@ import html
 import re
 from pathlib import Path
 
+from ..glyphs import for_emoji
+from ..glyphs import svg as glyph
 from ..render.docx import ICON_MARKER
-from ..glyphs import for_emoji, svg as glyph
 from ..theme import Theme
 
 CSS = """

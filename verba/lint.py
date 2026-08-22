@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import json
 import re
-from functools import lru_cache
 from dataclasses import dataclass
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 
 ERROR, WARN, INFO = "error", "warning", "info"

@@ -201,8 +201,9 @@ Rules:
 
 
 def _ask_for_descriptions(sec, node, wanted, inv, notes, emit) -> dict:
-    from .console import assist
     import json as _json
+
+    from .console import assist
 
     evidence = _json.dumps(inv, indent=2, ensure_ascii=False)[:9000]
     prompt = ASK.format(
@@ -319,8 +320,9 @@ def _sha_of(path) -> str:
 
 def _landed_where_asked(root: Path, screen_id: str, record: dict) -> bool:
     """Did the crawl of this screen finish on the page it was aiming for?"""
-    from .drift import _plausible
     import yaml as _yaml
+
+    from .drift import _plausible
     path = Path(root) / "content" / "screens.yaml"
     if not path.exists():
         return True

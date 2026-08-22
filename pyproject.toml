@@ -33,7 +33,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.5"]
+# Pinned, for the same reason the rule selection is.
+dev = ["ruff==0.14.5"]
 # The writing assistance talks to a model over the Anthropic Messages API. It is
 # optional because capture, drift, lint, build and release do not need it, and a
 # documentation tool should not require a model to render a document. It was
@@ -58,10 +59,29 @@ verba = ["console/static/*"]
 line-length = 100
 
 [tool.ruff.lint]
+# Pinned explicitly. Ruff's default selection changes between releases, so a
+# checkout that is clean on one machine fails on another with three hundred
+# findings nobody introduced. What is checked here is a decision, not whatever
+# the installed version happens to think today.
+select = ["E", "F", "W", "I"]
+
 # E702 is a semicolon joining two statements. Used here only for pairs that are
-# one thought (`self.page, self.text = a, b`-shaped bookkeeping), and splitting
-# them makes the surrounding logic harder to read rather than easier. Every
-# other default rule is on, including the ones that caught a duplicate dict key
-# silently discarding a section's own note, and seven values computed and thrown
-# away.
+# one thought, where splitting them makes the surrounding logic harder to read
+# rather than easier.
 ignore = ["E702"]
+
+[tool.ruff.lint.per-file-ignores]
+# E501 is a line over 100 characters. These files carry data rather than code:
+# SVG path geometry, injected browser scripts, CSS, YAML fixtures and prose
+# strings. Wrapping any of them makes the thing harder to read, not easier, and
+# a rule that has to be worked around everywhere it applies is being applied in
+# the wrong place.
+"verba/glyphs.py" = ["E501"]
+"verba/render/html.py" = ["E501"]
+"verba/forms.py" = ["E501"]
+"verba/healing.py" = ["E501"]
+"verba/layout.py" = ["E501"]
+"verba/lint.py" = ["E501"]
+"verba/scaffold.py" = ["E501"]
+"verba/system.py" = ["E501"]
+"tools/selftest.py" = ["E501"]

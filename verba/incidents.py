@@ -19,7 +19,6 @@ thing to permit than that.
 from __future__ import annotations
 
 import hashlib
-from .atomic import write_json
 import json
 import platform
 import sys
@@ -27,6 +26,8 @@ import traceback
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from .atomic import write_json
 
 STORE = "review/incidents.json"
 MAX_KEEP = 400

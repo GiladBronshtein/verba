@@ -15,11 +15,12 @@ Two things then use that record:
 from __future__ import annotations
 
 import hashlib
-from .atomic import write_json
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+
+from .atomic import write_json
 
 STORE = "review/decisions.json"
 

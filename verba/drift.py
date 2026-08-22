@@ -12,11 +12,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-
-from .naming import is_not_a_control
-
 from .capture import _norm
 from .imaging import distance, fingerprint_file
+from .naming import is_not_a_control
 
 # Which declared block type each captured element kind is compared against.
 KIND_MAP = {

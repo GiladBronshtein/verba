@@ -252,9 +252,9 @@ def t_system_description():
 
 @check("the sheet is a setting, and both outputs read the same one")
 def t_page_setup():
+    from verba import layout
     from verba.render.pdf import print_css
     from verba.typography import PAPERS, Typography
-    from verba import layout
 
     d = fresh()
     for name in ("Letter", "A5", "A4"):
@@ -299,6 +299,7 @@ def t_layout_atomic():
 @check("a setting is written without losing the page that explains it")
 def t_settings_keep_prose():
     import yaml
+
     from verba import layout
     d = fresh()
     was = {f: [line for line in (d / "content" / f).read_text().splitlines()
@@ -501,15 +502,16 @@ def t_atomic_writes():
     eq(got, 600, "writes were lost under concurrency: ")
 
     # and every store actually goes through it, or the guarantee is decorative
-    import verba.decisions
-    import verba.knowledge
-    import verba.notes
-    import verba.incidents
+    import inspect as _i
+
     import verba.assets
+    import verba.decisions
+    import verba.incidents
+    import verba.knowledge
     import verba.masking
+    import verba.notes
     import verba.version
     import verba.workspaces
-    import inspect as _i
     for mod in (verba.decisions, verba.knowledge, verba.notes, verba.incidents,
                 verba.assets, verba.masking, verba.version, verba.workspaces):
         src = _i.getsource(mod)

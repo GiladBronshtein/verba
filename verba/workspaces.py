@@ -17,12 +17,13 @@ removing it from the list would lose the only record of where it was.
 """
 from __future__ import annotations
 
-from .atomic import write_json
 import json
 from datetime import datetime
 from pathlib import Path
 
 import yaml
+
+from .atomic import write_json
 
 REGISTRY = Path.home() / ".verba" / "workspaces.json"
 

@@ -206,7 +206,7 @@ class Auto:
 
     def _notes(self, emit) -> str:
         """Work through what you wrote down, and say what happened to each."""
-        from .notes import Notes, resolve, FIXED, STUCK
+        from .notes import FIXED, STUCK, Notes, resolve
         notes = Notes.load(self.root)
         todo = notes.open_notes()
         if not todo:
@@ -256,8 +256,9 @@ class Auto:
     def _capture(self, screens: list, emit) -> bool:
         """Crawl exactly these screens. Returns whether it ran."""
         try:
-            from .cli import cmd_capture
             import argparse
+
+            from .cli import cmd_capture
             args = argparse.Namespace(
                 root=str(self.root), profile=None, screens=",".join(screens),
                 section=None, headed=False, no_mask=False, replay_steps=False,
@@ -279,6 +280,7 @@ class Auto:
         that offered to fix it was offering something it could not do.
         """
         import re as _re
+
         from .history import History
         artifact = _re.compile(
             r"^`?\s*description:\s*[\"']?TODO:\s*describe this\.?[\"']?\s*`?$",
@@ -316,9 +318,9 @@ class Auto:
         return f"{cleared} stray line(s) removed" if cleared else ""
 
     def _sweep(self, emit) -> str:
-        from .sweep import Sweep
         from .decisions import Decisions
         from .knowledge import Knowledge
+        from .sweep import Sweep
         p = self._project()
         sw = Sweep(p, self.root, Decisions.load(self.root), Knowledge.load(self.root))
         proposals = sw.run(None, log=None)
@@ -331,9 +333,9 @@ class Auto:
         return f"{written} section(s) written" if written else ""
 
     def _tidy(self, emit) -> str:
-        from .tidy import Tidy
         from .history import History
         from .knowledge import Knowledge
+        from .tidy import Tidy
         p = self._project()
         edits = Tidy(p, self.root).run(None, log=None)
         if not edits:
@@ -519,9 +521,9 @@ class Auto:
             return {}
 
     def _images(self, emit) -> str:
-        from .sweep import Sweep
         from .decisions import Decisions
         from .knowledge import Knowledge
+        from .sweep import Sweep
         p = self._project()
         sw = Sweep(p, self.root, Decisions.load(self.root), Knowledge.load(self.root))
         sw.run(None, log=None, write_text=False)
@@ -598,8 +600,8 @@ class Auto:
         return undone
 
     def _drift_report(self, project):
-        from .drift import analyse
         from .capture import latest_capture
+        from .drift import analyse
         run = latest_capture(self.root / "capture")
         if not run:
             return None
@@ -631,9 +633,9 @@ class Auto:
 
     def _apply_change(self, c: dict, decisions) -> bool:
         """Make one drift change, and record both the edit and the decision."""
+        from .capture import latest_capture
         from .console import actions
         from .history import History
-        from .capture import latest_capture
         p = self._project()
         sec = p.sections.get(c.get("section", ""))
         if sec is None:
@@ -659,10 +661,11 @@ class Auto:
         """Write one sweep proposal: a description filled in, or a picture used."""
         import shutil
         from datetime import date
+
+        from .assets import refresh_derived
         from .history import History
         from .model import parse_section
         from .sweep import Sweep
-        from .assets import refresh_derived
 
         pid = pr.id if hasattr(pr, "id") else pr.get("id")
         kind = pr.kind if hasattr(pr, "kind") else pr.get("kind")
