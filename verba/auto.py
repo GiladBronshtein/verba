@@ -90,6 +90,48 @@ class Step:
         return {**self.__dict__, "better": self.better}
 
 
+REVIEWS = "review/section-review.json"
+
+# A review that says nothing is wrong says so in many ways. These are the words
+# it uses when it has actually found something, and requiring one of them keeps
+# a rewrite from being triggered by "no issues found".
+WORTH = ("contradict", "omits", "omitted", "missing", "no longer", "incorrect",
+         "wrong", "outdated", "does not match", "not present", "renamed",
+         "should be", "inaccurate", "stale")
+
+
+def _worth_fixing(report: str) -> bool:
+    body = (report or "").strip().lower()
+    if not body or len(body) < 25:
+        return False
+    if any(p in body[:160] for p in
+           ("no issues", "nothing to report", "no problems", "accurate and",
+            "correctly describes", "no discrepanc")):
+        return False
+    return any(w in body for w in WORTH)
+
+
+def _first_point(report: str) -> str:
+    for line in (report or "").splitlines():
+        s = line.strip(" -*\t")
+        if len(s) > 20:
+            return s[:150]
+    return (report or "").strip()[:150]
+
+
+def _load_reviews(root) -> dict:
+    import json
+    try:
+        return json.loads((Path(root) / REVIEWS).read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_reviews(root, data: dict):
+    from .atomic import write_json
+    write_json(Path(root) / REVIEWS, data)
+
+
 MATCHES = "review/picture-match.json"
 
 
@@ -160,6 +202,8 @@ class Auto:
                        self._replace_unchecked_pictures, emit)
             self._step("look at the pictures nobody has checked",
                        self._look_at_pictures, emit)
+            self._step("read each section against what the crawl saw",
+                       self._review_against_evidence, emit)
             self._step("check each picture is of what its section describes",
                        self._check_pictures_match, emit)
             self._step("decide what nothing else could settle",
@@ -561,6 +605,101 @@ class Auto:
         except Exception:
             return {}
 
+    def _review_against_evidence(self, emit) -> str:
+        """Read each section against what the crawl actually saw, and correct it.
+
+        Everything else in this loop compares one narrow thing: a label to a
+        label, a picture to a section, a rule to a sentence. None of it reads
+        what a section *says* and asks whether the screen bears it out. A
+        section can name every column correctly, show the right picture, break
+        no rule, and still describe a control that is no longer there or leave
+        out the one thing the screen is for.
+
+        So each section is reviewed against its own evidence, and where the
+        review finds something substantive the section is reconciled with the
+        crawl and the result measured. A section already reviewed against the
+        capture it is being compared to is skipped, because nothing has changed
+        since and the second answer costs the same as the first.
+        """
+        from .console import assist
+        from .history import History
+        from .lint import lint
+        from .model import parse_section
+
+        proj = self._project()
+        ok, why = assist.available()
+        if not ok:
+            self._describe_blocked = why
+            return ""
+
+        run = ""
+        try:
+            from .capture import latest_capture
+            newest = latest_capture(self.root / "capture")
+            run = newest.name if newest else ""
+        except Exception:
+            pass
+
+        seen = _load_reviews(self.root)
+        corrected, looked = 0, 0
+        for node in proj.nodes:
+            sec = node.section
+            if sec is None or not sec.screens:
+                continue
+            if seen.get(sec.id, {}).get("run") == run:
+                continue                       # already read against this capture
+            inv = self._inventory_for(sec)
+            if not inv:
+                continue                       # nothing to hold it against
+
+            findings = [{"rule": f.rule, "level": f.level, "message": f.message,
+                         "detail": f.detail}
+                        for f in lint(proj) if sec.id in (f.section or "")]
+            prompt = assist.build_prompt("review", proj, sec, inv, [], findings, "")
+            res = assist.run_model(prompt, log=None)
+            if not res.ok:
+                self._describe_blocked = (res.error or "")[:120]
+                break
+            looked += 1
+            report = (res.output or "").strip()
+            seen[sec.id] = {"run": run, "report": report[:1200]}
+
+            if not _worth_fixing(report):
+                continue
+
+            emit(f"      {node.number} {sec.title}: {_first_point(report)}")
+            errors_before = self._errors()
+            snapshot = self._snapshot()
+            before = sec.path.read_text(encoding="utf-8")
+            fix = assist.build_prompt("reconcile", proj, sec, inv, [], findings,
+                                      "A review of this section found:\n" + report)
+            out = assist.run_model(fix, log=None)
+            if not out.ok:
+                continue
+            proposed = assist.clean_output(out.output)
+            try:
+                parsed = parse_section(proposed, sec.path)
+            except Exception:
+                continue
+            if parsed.id != sec.id or proposed.strip() == before.strip():
+                continue
+            sec.path.write_text(proposed, encoding="utf-8")
+            if self._errors() > errors_before:
+                self._restore(snapshot)
+                emit("        put back: the correction broke a rule")
+                proj = self._project()
+                continue
+            History(self.root).record(
+                sec.id, sec.path, before, proposed, actor="auto", action="review",
+                note=f"corrected against the crawl: {_first_point(report)[:110]}")
+            corrected += 1
+            proj = self._project()
+
+        _save_reviews(self.root, seen)
+        if corrected:
+            return f"{corrected} section(s) corrected against the crawl"
+        return f"{looked} section(s) read against the crawl" if looked else ""
+
     def _check_pictures_match(self, emit) -> str:
         """Is each picture actually of the thing its section describes?
 
@@ -630,12 +769,25 @@ class Auto:
             _, screens = load_screens(self.root / "content" / "screens.yaml")
         except Exception:
             return []
+        # Which pictures are already in the document, and where. Repointing to
+        # one that another section already shows trades a wrong picture for a
+        # duplicate, which is a worse finding than the one being fixed.
+        taken: dict[str, str] = {}
+        for sec in proj.sections.values():
+            for shot in sec.screenshots():
+                if shot:
+                    taken.setdefault(shot, sec.id)
         out = []
         for s in screens:
             shot = getattr(s, "shot", "")
             if shot and proj.assets.exists(shot):
-                out.append({"file": shot,
-                            "shows": getattr(s, "title", "") or s.id})
+                owner = taken.get(shot)
+                out.append({
+                    "file": shot,
+                    "shows": (getattr(s, "title", "") or s.id) + (
+                        f"  [already shown in {owner}, do not repoint to this]"
+                        if owner else "  [not used by any section]"),
+                })
         return out[:40]
 
     def _settle_the_rest(self, emit) -> str:
@@ -717,6 +869,12 @@ class Auto:
             sec = proj.sections.get(d["section"])
             if sec is None or not d["file"]:
                 continue
+            # Each decision is judged by itself. Measuring the step as a whole
+            # meant one bad call took the good ones down with it: a repoint that
+            # created a duplicate reverted the whole step, including a correct
+            # removal made beside it.
+            errors_before = self._errors()
+            snapshot = self._snapshot()
             before = sec.path.read_text(encoding="utf-8")
             if d["action"] == "repoint":
                 if not d["to"] or not proj.assets.exists(d["to"]):
@@ -730,6 +888,12 @@ class Auto:
                         action="decide",
                         note=f"{sec.id} now shows {d['to']} instead of "
                              f"{d['file']}: {d['why'][:110]}")
+                    if self._errors() > errors_before:
+                        self._restore(snapshot)
+                        emit(f"      put back: pointing {sec.id} at {d['to']} "
+                             f"broke a rule")
+                        proj = self._project()
+                        continue
                     emit(f"      {sec.id} now shows {d['to']}")
                     emit(f"        because {d['why'][:100]}")
                     done += 1
@@ -739,6 +903,11 @@ class Auto:
             if after == before:
                 continue
             sec.path.write_text(after, encoding="utf-8")
+            if self._errors() > errors_before:
+                self._restore(snapshot)
+                emit(f"      put back: removing {d['file']} broke a rule")
+                proj = self._project()
+                continue
             History(self.root).record(
                 sec.id, sec.path, before, after, actor="auto", action="decide",
                 note=f"took {d['file']} out of {sec.id}: {d['why'][:120]}")
