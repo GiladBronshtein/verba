@@ -238,65 +238,178 @@ async function refresh() {
    "Fields" are both evidence from the crawl; "Connections" and "Design" are
    both setup; History is neither, and lives with the evidence because that is
    what you go there to read. */
-const NAV = [
-  { items: [
-    ['overview',    'Overview',  'overview'],
-    ['findings',    'To fix',    'alert'],
-    ['queue',       'Changes',   'queue'],
-    ['sections',    'Sections',  'sections'],
-    ['document',    'Document',  'document'],
-  ]},
-  { label: 'Evidence', items: [
-    ['images',      'Images',    'camera'],
-    ['fields',      'Fields',    'form'],
-    ['history',     'History',   'history'],
-  ]},
-  { label: 'Setup', fold: true, items: [
-    ['documents',   'Documents',   'layers'],
-    ['connections', 'Connections', 'connections'],
-    ['editions',    'Editions',    'sections'],
-    ['design',      'Design',      'palette'],
-  ]},
+/* The rail is the process, not a shelf of nouns.
+
+   This was a flat list: Overview, To fix, Changes, Sections, Document, Images,
+   Fields, History, and a Setup drawer. Every entry true, none of them saying
+   what to do first, and the same 38 sections listed twice, once as "Sections"
+   and again as the outline underneath it. A person who already knew the
+   pipeline could work it. Nobody else could tell where they were in it.
+
+   Documenting a system is a sequence and it has a current position:
+
+     connect -> capture -> review -> write -> check -> publish
+
+   So the rail is that sequence, each step carrying its own state, and the step
+   with work in it is marked. It is not a wizard: every step stays clickable at
+   all times, because a person who wants to jump to Publish on a Tuesday is not
+   confused, they are working. What changes is that the order is now visible to
+   someone seeing this for the first time.
+
+   `state(S)` returns the one line under a step, and the tone that colours its
+   mark. Tone never carries meaning alone: the line says the same thing. */
+const STAGES = [
+  {
+    id: 'connections', n: 1, label: 'Connect', icon: 'connections',
+    state: (s) => {
+      const act = ((s.environments || {}).items || []).find(x => x.active);
+      if (!act) return { line: 'no system chosen yet', tone: 'todo' };
+      return act.ready
+        ? { line: `${act.label || act.id}, ready`, tone: 'done' }
+        : { line: act.status || 'not ready', tone: 'blocked' };
+    },
+  },
+  {
+    id: 'capture', n: 2, label: 'Capture', icon: 'camera',
+    state: (s) => {
+      const cap = s.capture || {};
+      if (!cap.run) return { line: 'nothing photographed yet', tone: 'todo' };
+      const imgs = (s.summary || {}).assets || 0;
+      return { line: `${ago(cap.run)} · ${imgs} image${imgs === 1 ? '' : 's'}`,
+               tone: (s.summary || {}).stale ? 'attention' : 'done' };
+    },
+  },
+  {
+    id: 'queue', n: 3, label: 'Review', icon: 'queue',
+    state: (s) => {
+      const d = (s.summary || {}).drift_items || 0;
+      return d
+        ? { line: `${d} change${d === 1 ? '' : 's'} from the live system`, tone: 'attention' }
+        : { line: 'matches the live system', tone: 'done' };
+    },
+  },
+  {
+    id: 'sections', n: 4, label: 'Write', icon: 'sections',
+    state: (s) => {
+      const sum = s.summary || {};
+      const n = sum.sections || 0;
+      const unverified = n - (sum.verified || 0);
+      return unverified
+        ? { line: `${n} sections · ${unverified} not verified`, tone: 'attention' }
+        : { line: `${n} sections, all verified`, tone: 'done' };
+    },
+  },
+  {
+    id: 'findings', n: 5, label: 'Check', icon: 'alert',
+    state: (s) => {
+      const sum = s.summary || {};
+      if (sum.error) return { line: `${sum.error} thing${sum.error === 1 ? '' : 's'} block a build`,
+                              tone: 'blocked' };
+      if (sum.warning) return { line: `${sum.warning} worth a look`, tone: 'attention' };
+      return { line: 'breaks no rules', tone: 'done' };
+    },
+  },
+  {
+    id: 'publish', n: 6, label: 'Publish', icon: 'publish',
+    state: (s) => {
+      const sum = s.summary || {};
+      if (sum.error) return { line: 'blocked until Check is clear', tone: 'todo' };
+      return { line: `${s.next_version || 'a version'} ready to cut`, tone: 'ready' };
+    },
+  },
 ];
+
+/* Not steps. Things you go and look at, at any point, and which have no place
+   in a sequence: the document as it prints, the evidence a crawl gathered, and
+   the record of every change. */
+const LOOK = [
+  ['document', 'Document', 'document'],
+  ['images',   'Images',   'camera'],
+  ['fields',   'Fields',   'form'],
+  ['history',  'History',  'history'],
+];
+
+/* Set once and then left alone, which is why it stays shut. */
+const SETUP = [
+  ['documents', 'Documents', 'layers'],
+  ['editions',  'Editions',  'sections'],
+  ['design',    'Design',    'palette'],
+];
+
+const NAV = [
+  { items: STAGES.map(s => [s.id, s.label, s.icon]) },
+  { label: 'Look at', items: LOOK },
+  { label: 'Set up', fold: true, items: SETUP },
+];
+
+/* Where the work is right now: the first step that is not done.
+
+   Used to decide what to open on arrival and which step to mark, so the two can
+   never disagree about what the person should be looking at. */
+function currentStage() {
+  const found = STAGES.find(st => {
+    const tone = st.state(S).tone;
+    return tone === 'blocked' || tone === 'attention' || tone === 'todo';
+  });
+  return found || STAGES[STAGES.length - 1];
+}
+
+function ago(stamp) {
+  // capture runs are stamped 2026-08-21T211503
+  const m = String(stamp || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return 'captured';
+  const then = new Date(+m[1], +m[2] - 1, +m[3]);
+  const days = Math.round((Date.now() - then) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 30) return `${days} days ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
 
 const NAV_IDS = NAV.flatMap(g => g.items.map(i => i[0]));
 
 function drawNav() {
   const n = $('#nav'); n.innerHTML = '';
-  const drift = (S.summary || {}).drift_items || 0;
-  const errors = (S.summary || {}).error || 0;
+  const here = currentStage().id;
 
-  const button = ([id, label, ic]) => {
+  // A step: its number, its name, and one line saying where it stands. The
+  // line matters more than the mark beside it, because the mark is a colour
+  // and a person who cannot separate two colours still has to be able to work.
+  const step = (st) => {
+    const s = st.state(S);
+    const b = el('button', 'step' + (view === st.id ? ' on' : '') +
+                           (st.id === here ? ' here' : ''));
+    b.dataset.v = st.id;
+    b.setAttribute('aria-current', view === st.id ? 'page' : 'false');
+    b.innerHTML =
+      `<span class="stepn ${s.tone}">${s.tone === 'done' ? '&#10003;' : st.n}</span>` +
+      `<span class="stepbody"><span class="stept">${esc(st.label)}</span>` +
+      `<span class="steps">${esc(s.line)}</span></span>`;
+    if (st.id === here) b.append(el('span', 'younow', 'now'));
+    b.onclick = () => setView(st.id);
+    return b;
+  };
+
+  const plain = ([id, label, ic]) => {
     const b = el('button', view === id ? 'on' : '', icon(ic) + `<span>${esc(label)}</span>`);
     b.dataset.v = id;
     b.setAttribute('aria-current', view === id ? 'page' : 'false');
-    // A badge says there is something waiting. It goes when there is not.
-    if (id === 'queue' && drift) b.append(el('span', 'count', drift));
-    if (id === 'findings' && errors) b.append(el('span', 'count', errors));
     b.onclick = () => setView(id);
     return b;
   };
 
-  NAV.forEach((group, gi) => {
-    if (!group.label) {
-      group.items.forEach(i => n.append(button(i)));
-      return;
-    }
-    // A folded group must still say when something inside it wants attention,
-    // or folding it away is hiding it.
-    const holdsView = group.items.some(i => i[0] === view);
-    if (group.fold) {
-      const d = el('details', 'navgroup');
-      d.open = holdsView || localStorage.getItem('verba.nav.' + gi) === '1';
-      d.ontoggle = () => localStorage.setItem('verba.nav.' + gi, d.open ? '1' : '0');
-      d.append(el('summary', null, esc(group.label)));
-      group.items.forEach(i => d.append(button(i)));
-      n.append(d);
-    } else {
-      n.append(el('div', 'navlabel', esc(group.label)));
-      group.items.forEach(i => n.append(button(i)));
-    }
-  });
+  n.append(el('div', 'navlabel', 'The document'));
+  STAGES.forEach(st => n.append(step(st)));
+
+  n.append(el('div', 'navlabel', 'Look at'));
+  LOOK.forEach(i => n.append(plain(i)));
+
+  const d = el('details', 'navgroup');
+  d.open = SETUP.some(i => i[0] === view) || localStorage.getItem('verba.nav.setup') === '1';
+  d.ontoggle = () => localStorage.setItem('verba.nav.setup', d.open ? '1' : '0');
+  d.append(el('summary', null, 'Set up'));
+  SETUP.forEach(i => d.append(plain(i)));
+  n.append(d);
 
   // Reload is something you do, not somewhere you go.
   const r = el('button', 'quiet', icon('refresh') + '<span>Reload</span>');
@@ -307,6 +420,17 @@ function drawNav() {
 
 function drawTree() {
   const t = $('#tree'); t.innerHTML = '';
+  // The outline belongs to writing, not to the whole application. It used to
+  // sit under the rail at all times, which meant every section appeared twice:
+  // once as the "Sections" destination and again as thirty-eight rows beneath
+  // it. Two lists of the same thing, one of them always the wrong one to click.
+  // Only inside a section. On the Sections list the table *is* the outline,
+  // and showing both is the duplication this was pulled out of the rail to end.
+  // With one section open it stops being a second list and becomes what it was
+  // always for: moving to the next section without going back first.
+  const writing = view === 'section';
+  t.hidden = !writing;
+  if (!writing) return;
   t.append(el('div', 'head', 'Outline'));
   S.sections.forEach(s => {
     const r = el('div', `row l${s.level}${s.id === currentId && view === 'section' ? ' on' : ''}`);
@@ -379,27 +503,27 @@ function nextStep() {
   if (s.error)
     return { tone: 'bad', what: `${s.error} thing${s.error > 1 ? 's' : ''} to fix`,
              why: 'These stop the document being built. Most of them clear themselves.',
-             cta: 'Fix what can be fixed', go: fixEverything,
+             cta: 'Fix what can be fixed', go: fixEverything, at: 'findings',
              also: ['See them', () => setView('findings')] };
   if (s.drift_items)
     return { tone: 'warn',
              what: `${s.drift_items} change${s.drift_items > 1 ? 's' : ''} in the live system`,
              why: 'The product moved. The mechanical ones apply on their own.',
-             cta: 'Apply what can be applied', go: fixEverything,
+             cta: 'Apply what can be applied', go: fixEverything, at: 'queue',
              also: ['See them', () => setView('queue')] };
   if (!S.capture || !S.capture.run)
     return { tone: 'go', what: 'Nothing has been photographed yet',
              why: 'A crawl signs in, pictures every screen and reads its labels.',
-             cta: 'Capture the live system',
+             cta: 'Capture the live system', at: 'capture',
              go: () => runJob('/api/capture', {}, 'capture') };
   if (s.stale)
     return { tone: 'warn', what: `${s.stale} section${s.stale > 1 ? 's' : ''} not checked lately`,
              why: 'Re-crawl to confirm they still match the product.',
-             cta: 'Capture the live system',
+             cta: 'Capture the live system', at: 'capture',
              go: () => runJob('/api/capture', {}, 'capture') };
   return { tone: 'ok', what: 'The document matches the system and breaks no rules',
            why: 'Nothing is outstanding. This is the moment to cut a version.',
-           cta: 'Publish', go: () => setView('publish') };
+           cta: 'Publish', go: () => setView('publish'), at: 'publish' };
 }
 
 /* Everything the system can settle, in one press.
@@ -415,6 +539,10 @@ function fixEverything() {
 function nextStepBar() {
   const n = nextStep();
   if (!n) return null;
+  // Not on the step it is pointing at. The rail already says where the work is
+  // and the step's own page already offers the action, so repeating both in a
+  // banner above them is the interface saying the same thing three times.
+  if (n.at && n.at === view) return null;
   const bar = el('div', 'nextbar ' + n.tone);
   const dot = el('span', 'nsdot');
   const body = el('div', 'nsbody');
@@ -444,7 +572,11 @@ function nextStepBar() {
 
 function render() {
   const m = holder();
-  if (view === 'overview') return drawOverview(m);
+  if (view === 'capture') return drawCapture(m);
+  // Overview is gone. It was seven unrelated panels stacked in one place, and
+  // every one of them now lives with the step it belongs to. Anything still
+  // asking for it gets the step that has the work.
+  if (view === 'overview') { view = currentStage().id; return render(); }
   if (view === 'sections') return drawSections(m);
   if (view === 'queue') return drawQueue(m);
   if (view === 'publish') return drawPublish(m);
@@ -523,103 +655,71 @@ function firstRun(s) {
   return wrap;
 }
 
-function drawOverview(m) {
-  const s = S.summary;
+/* Step 2. Photographing the system.
+
+   This had no home. The button lived on the old Overview beside five others,
+   the safety guarantees sat in a panel under it, and what the last crawl found
+   was in a third place, so "have I got a current picture of the product?" was
+   a question you answered by reading three panels and doing the sums. */
+function drawCapture(m) {
   m.innerHTML = '';
-  const fb = fixtureBanner();
-  m.append(el('h2', 'page', esc(S.product.name) + ' documentation'));
+  m.append(el('h2', 'page', 'Capture the live system'));
   m.append(el('div', 'muted',
-    `Edition <b>${esc(S.profile)}</b> · next version ${esc(S.next_version)}` +
-    (S.capture.run ? ` · last capture ${esc(S.capture.run)}` : ' · no capture yet')));
+    'Sign in, photograph every screen, and read the labels off each one. ' +
+    'Nothing is ever written to the product.' + hint(
+      'A crawl is the evidence everything else rests on. The differences in ' +
+      'Review, the labels in Fields and the pictures in the document all come ' +
+      'from here, so a document is only ever as current as its last capture.')));
 
-  // A project that has never been crawled has nothing to report, and six
-  // zeroes in a row is not a report: it is a dashboard describing its own
-  // emptiness. Until there is evidence, the space says what to do instead.
-  if (!S.capture.run && !s.assets) {
-    m.append(firstRun(s));
-  } else {
-    const strip = el('div', 'stats');
-    const cell = (k, v, cls) => strip.append(
-      el('div', 'cell ' + (cls || ''), `<div class="v">${v}</div><div class="k">${esc(k)}</div>`));
-    cell('sections', s.sections);
-    cell('verified', s.verified, s.verified === s.sections ? 'good' : '');
-    cell('stale', s.stale, s.stale ? 'bad' : 'good');
-    cell('drift', s.drift_items, s.drift_items ? 'warn' : 'good');
-    cell('lint errors', s.error, s.error ? 'bad' : 'good');
-    cell('images', s.assets);
-    m.append(strip);
-  }
-  if (fb) m.append(fb);
-
-  const p = el('div', 'panel');
-  p.append(el('h3', null, icon('play') + 'Pipeline'));
-  const row = el('div', 'row');
-  const b = (label, cls, fn) => {
-    const x = el('button', 'act ' + (cls || ''), label);
-    x.onclick = fn; row.append(x); return x;
-  };
-  // The whole loop, first, because it is what most days need.
-  const autoBtn = b(icon('play') + 'Run everything', 'primary', () => modal({
-    title: 'Photograph every screen, then fix what can be fixed?',
-    body: '<p>It signs in and photographs <b>every screen in the document</b>, '
-        + 'watch it happen as it goes. Then it holds what the document says '
-        + 'against what came back: applies the differences, fills the gaps the '
-        + 'evidence can answer, fixes the writing, and adopts the new pictures.</p>'
-        + '<p class="muted">Every step is measured, and anything that makes the '
-        + 'rule findings worse is put straight back. Whatever is genuinely your '
-        + 'call is listed at the end with the reason. Nothing is written to the '
-        + 'platform, and every change is in History.</p>'
-        + '<p class="muted">On a large document this takes a few minutes.</p>',
-    confirmLabel: 'Run it', confirmClass: 'primary',
-    onConfirm: () => runJob('/api/auto', { rounds: 3, crawl: true }, 'run everything'),
-  }));
-  autoBtn.title = 'Photograph every screen, apply the differences, fix the '
-                + 'writing, and stop only where you are needed';
-  const capBtn = b(icon('camera') + 'Capture the live system', '', () => runCapture(null));
-  const act = ((S.environments || {}).items || []).find(x => x.active);
-  if (!act || !act.ready) {
-    capBtn.disabled = autoBtn.disabled = true;
-    const why = act ? act.status : 'Set up a connection first';
-    capBtn.title = autoBtn.title = why;
-  }
-  b(icon('search') + 'Check for drift', '', () => runJob('/api/drift/run', {}, 'drift'));
-  b(icon('publish') + 'Build draft, DOCX and PDF', '', () => publish(null, ['docx','pdf'], '', false));
-  b(icon('queue') + 'Open the review queue', 'ghost', () => setView('queue'));
-  p.append(row);
+  const cap = S.capture || {};
+  const sum = S.summary || {};
   const active = ((S.environments || {}).items || []).find(x => x.active);
-  const line = el('div', 'muted');
-  line.innerHTML = active
-    ? `Crawling <b>${esc(active.label || active.id)}</b> at ${esc(active.base_url)}. ` +
-      `${active.ready ? '' : '<span style="color:var(--red)">' + esc(active.status) +
-      '.</span> '}<a href="#" id="goConn">Connections</a>`
-    : 'No connection profile yet. <a href="#" id="goConn">Set one up</a>.';
-  p.append(line);
-  setTimeout(() => { const a = $('#goConn'); if (a) a.onclick = ev => {
-    ev.preventDefault(); setView('connections'); }; }, 0);
-  m.append(p);
+
+  const state = el('div', 'panel');
+  if (!cap.run) {
+    state.append(el('div', 'empty',
+      'Nothing has been photographed yet. This is the first thing to do.'));
+  } else {
+    state.append(el('h3', null, 'The last capture'));
+    const g = el('div', 'kv');
+    g.innerHTML =
+      `<div><span>When</span><b>${esc(ago(cap.run))}</b></div>` +
+      `<div><span>Run</span><b class="mono">${esc(cap.run)}</b></div>` +
+      `<div><span>Images in the document</span><b>${sum.assets || 0}</b></div>` +
+      `<div><span>Sections not checked lately</span><b>${sum.stale || 0}</b></div>`;
+    state.append(g);
+  }
+
+  const row = el('div', 'row'); row.style.marginTop = '14px';
+  const go = el('button', 'act primary', icon('camera') + 'Photograph every screen');
+  go.onclick = () => runCapture(null);
+  const one = el('button', 'act', icon('sections') + 'Just one section');
+  one.onclick = () => setView('sections');
+  one.title = 'Open a section and recapture only the screens it uses';
+  row.append(go, one);
+  if (!active || !active.ready) {
+    go.disabled = true;
+    go.title = active ? active.status : 'Choose a system to document first';
+    const fix = el('button', 'act', icon('connections') + 'Set up the connection');
+    fix.onclick = () => setView('connections');
+    row.append(fix);
+  }
+  state.append(row);
+  m.append(state);
+
   m.append(safetyPanel());
 
-  if (S.global_lint.length) {
-    const q = el('div', 'panel');
-    q.append(el('h3', null, 'Document-wide findings'));
-    const tb = el('table', null, '<thead><tr><th>Rule</th><th>Level</th><th>Finding</th></tr></thead>');
-    const bd = el('tbody');
-    S.global_lint.forEach(f => bd.append(el('tr', null,
-      `<td><code>${esc(f.rule)}</code></td>
-       <td><span class="chip ${f.level === 'error' ? 'err' : 'warn'}">${esc(f.level)}</span></td>
-       <td>${esc(f.message)}${f.detail ? `<div class="muted">${esc(f.detail)}</div>` : ''}</td>`)));
-    tb.append(bd); q.append(tb); m.append(q);
-  }
-
-  if (S.capture.unmapped_screens.length) {
+  if ((cap.unmapped_screens || []).length) {
     const u = el('div', 'panel');
-    u.append(el('h3', null, 'Screens with no section'));
-    u.append(el('div', 'muted', 'Captured in the product but not documented anywhere.'));
-    S.capture.unmapped_screens.forEach(x => u.append(el('div', null, `<code>${esc(x)}</code>`)));
+    u.append(el('h3', null, 'Photographed, but in no section'));
+    u.append(el('div', 'muted',
+      'These screens are in the registry and were captured, but no section ' +
+      'shows them. Either write a section for one, or take it out of ' +
+      'content/screens.yaml.'));
+    cap.unmapped_screens.forEach(x => u.append(el('div', null, `<code>${esc(x)}</code>`)));
     m.append(u);
   }
 
-  m.append(outputsPanel());
   m.append(jobsPanel());
 }
 
@@ -646,7 +746,7 @@ function signInPanel() {
     try {
       const r = await api('/api/credentials',
         { method: 'POST', json: { user, password } });
-      toast(r.message); await refresh(); setView('overview');
+      toast(r.message); await refresh(); setView(currentStage().id);
     } catch (e) { toast(e.message, true); go.disabled = false; }
   };
   row.append(go); p.append(row);
@@ -707,7 +807,7 @@ function showMasking() {
     'sent back, so the platform is never changed. Rules live in ' +
     '<code>content/masking.yaml</code>.')));
   const back = el('button', 'act', 'Back'); back.style.margin = '13px 0';
-  back.onclick = () => setView('overview'); m.append(back);
+  back.onclick = () => setView(currentStage().id); m.append(back);
   const p = el('div', 'panel');
   const rows = (S.masking && S.masking.map) || [];
   if (!rows.length) {
@@ -732,7 +832,7 @@ function showRoutes() {
     'clicking through from the top, and falls back to replaying the steps if the ' +
     'address stops resolving.')));
   const back = el('button', 'act', 'Back'); back.style.margin = '13px 0';
-  back.onclick = () => setView('overview'); m.append(back);
+  back.onclick = () => setView(currentStage().id); m.append(back);
   const p = el('div', 'panel');
   const t = el('table', null, `<thead><tr><th>Screen</th><th>Sections</th>
     <th>Address</th><th>Last seen</th><th></th></tr></thead>`);
@@ -3445,11 +3545,11 @@ function boot() {
   setupRail();
   $('#profile').onchange = async e => {
     await api('/api/profile', { method: 'POST', json: { profile: e.target.value } });
-    currentId = null; await refresh(); setView('overview');
+    currentId = null; await refresh(); setView(currentStage().id);
   };
   window.onbeforeunload = () => dirty ? 'Unsaved edits' : undefined;
   adoptRunningJob();
-  refresh().then(() => setView('overview')).catch(e => {
+  refresh().then(() => setView(currentStage().id)).catch(e => {
     holder().innerHTML = `<div class="panel warn-edge"><h3>Could not load the project</h3>
       <div class="muted">${esc(e.message)}</div></div>`;
   });
