@@ -844,7 +844,13 @@ class Handler(BaseHTTPRequestHandler):
                         bound.setdefault(sid, []).append(sec.id)
                 merged, _ = _merged(st.root / "capture")
                 seen = merged.get("screens", {})
+                # Pictures the document ships that no screen produces. They are
+                # a hole in the registry, not a fault in the document, so they
+                # are reported here rather than beside the writing.
+                unreachable = [f.message.split(":", 1)[-1].strip()
+                               for f in lint(proj) if f.rule == "ASSET-11"]
                 return self.json({
+                    "unreachable": unreachable,
                     "base_url": site.get("base_url", ""),
                     "path": str(st.root / "content" / "screens.yaml"),
                     "screens": [{

@@ -1510,6 +1510,26 @@ async function drawScreens(m) {
     m.append(w);
   }
 
+  // The gap that matters most: pictures shipping in the document that no screen
+  // here produces. No capture will ever replace them, so no button can fix it,
+  // and saying so plainly is worth more than another finding in a list.
+  if ((d.unreachable || []).length) {
+    const u = el('div', 'panel warn-edge');
+    u.append(el('h3', null, `${d.unreachable.length} picture(s) no crawl can reach`));
+    u.append(el('div', 'muted',
+      'These ship in the document and no screen here produces them, so ' +
+      'photographing the system will never replace them. They were added by ' +
+      'hand or came out of an older document, which also means nothing has ' +
+      'checked them for real customer names.'));
+    u.append(el('div', 'muted',
+      'Either register a screen that captures the view, or take the picture ' +
+      'out of the section. Both are decisions about the document.'));
+    const list = el('div', 'unreach');
+    d.unreachable.forEach(n => list.append(el('code', null, esc(n))));
+    u.append(list);
+    m.append(u);
+  }
+
   const panel = el('div', 'panel'); panel.style.padding = '0';
   const tb = el('table', null,
     '<thead><tr><th>Screen</th><th>Shown in</th><th>Reads</th>' +

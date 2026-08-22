@@ -178,6 +178,17 @@ REMEDIES = {
     "ASSET-08":   ("Edit the section", "open",
                    "Give it a caption only if it really is a picture of a screen; "
                    "otherwise leave it captionless and it renders as a detail."),
+    # "open" rather than "none": nothing can decide this, but the person can,
+    # and the place to do it is the section that ships the picture. A finding
+    # with nothing to press is a complaint, which is a rule this project holds
+    # itself to and I had just broken.
+    "ASSET-11":   ("Open the section that shows it", "open",
+                   "Nothing has checked this picture for real names, and no "
+                   "screen in the registry produces it, so photographing the "
+                   "system will never replace it. Someone added it by hand, or "
+                   "it came out of an older document. Either register a screen "
+                   "that captures this view, or take the picture out. Nothing "
+                   "can decide that for you."),
     "ASSET-10":   ("Photograph this screen properly", "capture",
                    "This picture never went through masking, so nothing has "
                    "checked whether it shows a real customer's account. "
@@ -475,6 +486,24 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
     # This does not claim the image is wrong. It says nobody has checked, which
     # for a rule the project calls absolute is the thing worth reporting.
     registry = getattr(project.assets, "registry", {}) or {}
+    # Whether a crawl could replace this picture at all. A picture the registry
+    # produces can be settled by photographing that screen; one it does not is a
+    # detail view somebody added by hand, and no amount of crawling will reach
+    # it. Reporting both the same way sent people to press a button that could
+    # never work.
+    shots: set[str] = set()
+    try:
+        from .capture import load_screens
+        _, _screens = load_screens(project.root / "content" / "screens.yaml")
+        for s in _screens:
+            if getattr(s, "shot", ""):
+                shots.add(s.shot)
+            for elem in (getattr(s, "elements", []) or []):
+                if isinstance(elem, dict) and elem.get("name"):
+                    shots.add(elem["name"])
+    except Exception:
+        pass
+
     for name in sorted(used):
         rec = registry.get(name) or {}
         src = str(rec.get("source", ""))
@@ -483,8 +512,17 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         where = ("lifted from " + str(rec.get("legacy_name"))
                  if rec.get("legacy_name") else
                  "added outside a crawl" if src else "no record of where it came from")
-        add(Finding("ASSET-10", WARN, "",
-                    f"picture never went through masking: {name}", where))
+        if name in shots:
+            add(Finding("ASSET-10", WARN, "",
+                        f"picture never went through masking: {name}",
+                        f"{where}. A screen produces this one, so photographing "
+                        f"it will settle it."))
+        else:
+            owner = (used.get(name) or [""])[0]
+            add(Finding("ASSET-11", WARN, owner,
+                        f"picture no crawl can reach: {name}",
+                        f"{where}. No screen in content/screens.yaml produces "
+                        f"this file, so no capture will ever replace it."))
 
     for name in project.assets.all_names():
         if name not in held:
