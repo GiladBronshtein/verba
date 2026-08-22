@@ -453,6 +453,152 @@ TASKS = {
 }
 
 
+LOOK_SYSTEM = """You are checking a screenshot that is about to be published in
+product documentation. The one thing that must never appear is a real customer's
+name: a real company, a real person, a real email address or a real domain.
+
+Placeholders are fine and expected. Anything that reads as obviously invented
+for documentation is a placeholder: Test Publisher 1, Example Account, Acme,
+Contoso, Northwind, user1@example.com, and identifiers that are clearly padded
+with zeros.
+
+The product's own name, the vendor's own name, and the names of well known
+platforms that are simply features of the interface are NOT customer names.
+They belong there.
+
+Answer in exactly this shape and nothing else:
+
+CLEAN
+or
+NAMES: the exact strings you saw, comma separated
+
+Say NAMES only for something you can actually read in the picture. Do not guess
+from the layout, and do not report a name you merely suspect."""
+
+
+def forbidden_names(root: Path | str = ".") -> list[str]:
+    """The exact strings that must never appear in a shipped picture.
+
+    Two sources, both already known to this system and neither of them a guess:
+    every real value the crawler has ever replaced, which is what the masking
+    map is, and the operator name each edition writes into its own text, which
+    is the customer a neutral edition must not name.
+
+    Handing these over turns "does this look like a real customer name?", which
+    a model will answer differently on different days, into "is any of these
+    strings in the picture?", which it will not.
+    """
+    root = Path(root)
+    names: set[str] = set()
+    try:
+        import json
+        mp = json.loads((root / "content" / "masking-map.json")
+                        .read_text(encoding="utf-8")).get("map", {})
+        for key in mp:
+            # keys look like "column:account Northwind Trading"
+            value = key.split(" ", 1)[1] if " " in key else key
+            if len(value) > 2:
+                names.add(value.strip())
+    except Exception:
+        pass
+    try:
+        import yaml
+        for prof in sorted((root / "content" / "profiles").glob("*.yaml")):
+            data = yaml.safe_load(prof.read_text(encoding="utf-8")) or {}
+            op = ((data.get("vars") or {}).get("operator") or {})
+            for key in ("name", "possessive"):
+                v = str(op.get(key, "")).strip()
+                if v and len(v) > 2 and not v.lower().startswith("your "):
+                    names.add(v)
+    except Exception:
+        pass
+    return sorted(names)
+
+
+def look(image: Path | str, product: str = "", vendor: str = "",
+         forbid: list[str] | None = None, timeout: int = 90) -> AssistResult:
+    """Ask the model what a picture shows.
+
+    Masking runs in the browser before the shutter and cannot help a picture
+    that arrived some other way. For those, the only check that means anything
+    is somebody looking, and a model that can see is somebody who can look at
+    forty of them without getting bored on the eleventh.
+
+    Its verdict is recorded as the model's, not as proof of masking, because it
+    can be wrong and the difference matters.
+    """
+    import base64
+
+    path = Path(image)
+    if not path.exists():
+        return AssistResult(False, error=f"no picture at {path}")
+    kind = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    known = ""
+    if product or vendor:
+        known = (f"\n\nThe product is {product or 'this product'}"
+                 f"{f', made by {vendor}' if vendor else ''}. Its own name and "
+                 f"its vendor's name are not customer names.")
+    if forbid:
+        # The decisive part. Asking a model to judge what looks like a real
+        # customer name gets a different answer on different days: this exact
+        # picture was called clean under one wording and flagged under another.
+        # A list of strings to look for is a question with one answer.
+        known += ("\n\nThese exact strings must NEVER appear in a published "
+                  "picture. If you can read any of them, report it:\n"
+                  + "\n".join(f"  {n}" for n in forbid[:80]))
+    content = [
+        {"type": "image", "source": {"type": "base64", "media_type": kind,
+                                     "data": base64.standard_b64encode(
+                                         path.read_bytes()).decode()}},
+        {"type": "text", "text": "Check this screenshot." + known},
+    ]
+
+    ok_, why = available()
+    if not ok_:
+        return AssistResult(False, error=why)
+    try:
+        import anthropic
+    except ImportError:
+        return AssistResult(False, error="the anthropic package is not installed")
+
+    if LITELLM_BASE and gateway_key():
+        client = anthropic.Anthropic(base_url=LITELLM_BASE, api_key=gateway_key(),
+                                     timeout=timeout)
+        backend = "litellm"
+    else:
+        key = os.environ.get("ANTHROPIC_API_KEY") or stored_api_key()
+        if not key:
+            # The CLI cannot be handed an image on stdin, so looking is the one
+            # thing that genuinely needs a key rather than a local Claude Code.
+            return AssistResult(False, error=(
+                "looking at a picture needs a key. The Claude Code CLI cannot "
+                "be given an image, so add a key under Set up, The writer."))
+        client = anthropic.Anthropic(api_key=key, timeout=timeout)
+        backend = "api"
+
+    try:
+        msg = client.messages.create(
+            model=DEFAULT_MODEL, max_tokens=400, system=LOOK_SYSTEM,
+            messages=[{"role": "user", "content": content}])
+        return AssistResult(True, output=_text_of(msg).strip(), backend=backend)
+    except Exception as e:
+        return AssistResult(False, error=str(e)[:300], backend=backend)
+
+
+def read_verdict(text: str) -> tuple[bool, list[str]]:
+    """(clean, names). Anything unparseable is treated as not clean."""
+    body = (text or "").strip()
+    if not body:
+        return False, []
+    first = body.splitlines()[0].strip()
+    if first.upper().startswith("CLEAN"):
+        return True, []
+    if ":" in first:
+        found = [n.strip(" .'\"") for n in first.split(":", 1)[1].split(",")]
+        return False, [n for n in found if n]
+    return False, []
+
+
 def build_prompt(task: str, project, section, inventory, drift, findings,
                  notes: str = "") -> str:
     evidence = _evidence(project, section, inventory, drift)

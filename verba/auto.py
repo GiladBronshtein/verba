@@ -125,6 +125,8 @@ class Auto:
             self._step("use the pictures the crawl took", self._images, emit)
             self._step("replace pictures nobody has checked",
                        self._replace_unchecked_pictures, emit)
+            self._step("look at the pictures nobody has checked",
+                       self._look_at_pictures, emit)
             self._step("rewrite what the rules object to", self._polish, emit)
 
             # Not "the rules are clean": a document can break no rules and still
@@ -521,6 +523,87 @@ class Auto:
                     if sid in merged.get("screens", {})}
         except Exception:
             return {}
+
+    def _look_at_pictures(self, emit) -> str:
+        """Have the model look at every picture nobody has checked.
+
+        The finding says nobody has checked this picture for real customer
+        names. That was reported as a thing only a person could settle, and a
+        person was then offered eighteen buttons to press one at a time. But
+        looking at a picture and reading the names in it is exactly what a model
+        that can see is for, and one is already configured for the writing.
+
+        A clean verdict is recorded as the model's, not as proof of masking:
+        it can be wrong, and conflating "a model looked and saw nothing" with
+        "the masking rules ran on this" would be claiming something untrue about
+        a control that exists to protect a customer.
+
+        A name found is worth more than a verdict. It goes back as the exact
+        string, so the next thing that happens is a masking rule rather than
+        another round of looking.
+        """
+        from .console import assist
+        from .lint import lint
+
+        proj = self._project()
+        want = []
+        for f in lint(proj):
+            if f.rule not in ("ASSET-10", "ASSET-11"):
+                continue
+            name = f.message.split(":", 1)[-1].strip()
+            if proj.assets.exists(name):
+                want.append(name)
+        if not want:
+            return ""
+
+        ok, why = assist.available()
+        if not ok:
+            self._describe_blocked = why
+            emit(f"    cannot look at pictures: {why}")
+            return ""
+
+        product = (proj.config.get("product") or {})
+        clean, flagged = 0, []
+        forbid = assist.forbidden_names(self.root)
+        emit(f"    looking at {len(want)} picture(s), "
+             f"against {len(forbid)} name(s) that must never appear")
+        for name in want:
+            res = assist.look(proj.asset_path(name),
+                              product=str(product.get("name", "")),
+                              vendor=str(product.get("vendor", "")),
+                              forbid=forbid)
+            if not res.ok:
+                self._describe_blocked = (res.error or "")[:120]
+                emit(f"      could not look at {name}: {res.error}")
+                break
+            is_clean, names = assist.read_verdict(res.output)
+            if is_clean:
+                entry = proj.assets.registry.setdefault(name, {})
+                entry["checked_by"] = {
+                    "who": f"the model ({assist.DEFAULT_MODEL})",
+                    "when": datetime.now().strftime("%Y-%m-%d"),
+                    "note": "looked and saw no real customer name",
+                }
+                proj.assets.save()
+                clean += 1
+            else:
+                flagged.append((name, names))
+                emit(f"      {name}: real name(s) visible: {', '.join(names) or 'unclear'}")
+
+        for name, names in flagged:
+            self.for_you.append({
+                "what": f"{name} shows a real name: {', '.join(names)}",
+                "why": "A picture that never went through masking, and the model "
+                       "can read a real name in it.",
+                "do": "Add that name under Names so it is replaced, then "
+                      "photograph the screen again, or take the picture out."})
+
+        bits = []
+        if clean:
+            bits.append(f"{clean} picture(s) checked and clean")
+        if flagged:
+            bits.append(f"{len(flagged)} showing a real name")
+        return ", ".join(bits)
 
     def _replace_unchecked_pictures(self, emit) -> str:
         """Swap in a freshly masked photograph wherever one is available.

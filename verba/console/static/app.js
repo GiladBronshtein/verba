@@ -953,24 +953,24 @@ async function drawFindings(m) {
     m.append(bar);
   }
 
-  await drawSurvey(m);
-
   if (!d.findings.length) {
+    await drawSurvey(m);
     m.append(el('div', 'panel accent',
       '<div class="empty">The document is clean.</div>'));
+    await drawNotes(m);
     return;
   }
 
-  await drawNotes(m);
-  await drawTidy(m);
-
-  const bulk = el('div', 'row'); bulk.style.margin = '14px 0';
-  const sweepAll = el('button', 'act',
-    icon('edit') + 'Ask the writer about everything unwritten');
-  sweepAll.onclick = () => runJob('/api/sweep', {}, 'review');
-  const relint = el('button', 'act', icon('refresh') + 'Check again');
-  relint.onclick = () => drawFindings(holder());
-  bulk.append(sweepAll, relint); m.append(bulk);
+  // The findings, and then everything else.
+  //
+  // This page opened with five other things to press before the list even
+  // started: a panel of four zeros saying no crawl would tell us anything, a
+  // note box, a second fixer, and two more buttons. Each of them does something
+  // the primary action already does or does not need doing at all, and every
+  // one of them was between a person and the thing they came here to look at.
+  // "Fix what can be fixed" runs the writing fixer, the sweep and the re-check
+  // as part of its own loop, so offering them again alongside it is offering
+  // the same work three times under different names.
 
   const LEVEL = { error: 'err', warning: 'warn', info: '' };
   ['error', 'warning', 'info'].forEach(level => {
@@ -1009,6 +1009,29 @@ async function drawFindings(m) {
     });
     m.append(p);
   });
+
+  // Kept, because each is occasionally the right tool, and folded, because none
+  // of them is the thing to reach for first. This page used to open with all of
+  // them: a panel of four zeros saying no crawl would tell us anything, a note
+  // box, a second fixer and two more buttons, every one of them between a
+  // person and the list they came here to read. "Fix what can be fixed" already
+  // runs the writing fixer, the sweep and the re-check inside its own loop.
+  const more = el('details', 'advanced');
+  more.append(el('summary', null, 'Other ways to work at this'));
+  const inner = el('div', 'pad');
+  await drawSurvey(inner);
+  await drawNotes(inner);
+  await drawTidy(inner);
+  const bulk = el('div', 'row');
+  const sweepAll = el('button', 'act',
+    icon('edit') + 'Ask the writer about everything unwritten');
+  sweepAll.onclick = () => runJob('/api/sweep', {}, 'review');
+  const relint = el('button', 'act', icon('refresh') + 'Check again');
+  relint.onclick = () => drawFindings(holder());
+  bulk.append(sweepAll, relint);
+  inner.append(bulk);
+  more.append(inner);
+  m.append(more);
 }
 
 /* Read the document before opening a browser. A crawl is the expensive step,
