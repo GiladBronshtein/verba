@@ -1024,3 +1024,9 @@ details.advanced > summary::before{content:"\25B8";color:var(--text-3);
 details.advanced[open] > summary::before{transform:rotate(90deg)}
 details.advanced > summary:hover{color:var(--text)}
 details.advanced .pad{padding:0 16px 16px}
+
+/* a heading between panels, quieter than a page title */
+h3.sub{font-size:14px;font-weight:600;margin:24px 0 8px}
+
+/* a heading between panels, quieter than a page title */
+h3.sub{font-size:14px;font-weight:600;margin:24px 0 8px}

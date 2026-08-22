@@ -327,6 +327,7 @@ const LOOK = [
   ['screens',  'Screens',  'overview'],
   ['images',   'Images',   'camera'],
   ['fields',   'Fields',   'form'],
+  ['masking',  'Names',    'shield'],
   ['history',  'History',  'history'],
 ];
 
@@ -630,6 +631,7 @@ function render() {
   if (view === 'documents') return drawDocuments(m);
   if (view === 'assistant') return drawAssistant(m);
   if (view === 'screens') return drawScreens(m);
+  if (view === 'masking') return drawMasking(m);
   if (view === 'fields') return drawFields(m);
   if (view === 'findings') return drawFindings(m);
   if (view === 'section') return drawSection(m);
@@ -1346,6 +1348,120 @@ async function drawFields(m) {
            'the crawler struggles to name in the document.')));
     d.a11y.slice(0, 40).forEach(a => p.append(el('div', 'muted',
       `<b>${esc(a.field)}</b> on ${esc(a.screen)}: ${esc(a.issue)}`)));
+    m.append(p);
+  }
+}
+
+/* --------------------------------------------------------------- masking */
+/* Which real names must never appear in a picture.
+
+   The rules ran in the browser milliseconds before every screenshot and lived
+   in a YAML file nobody could see. That is a strange place for a control whose
+   whole job is stopping one customer's account appearing in another customer's
+   document: a person who needs to check it is usually not the person who wrote
+   it, and often has a reason to be nervous.
+
+   Adding a literal is offered here because it is the rule anybody can state:
+   this exact name, that instead. Columns and patterns need a selector or a
+   regular expression and stay in the file, where the comments explaining them
+   are. */
+async function drawMasking(m) {
+  m.innerHTML = '';
+  m.append(el('h2', 'page', 'Names in pictures'));
+
+  let d;
+  try { d = await api('/api/masking'); }
+  catch (e) { m.append(el('div', 'panel', `<div class="empty">${esc(e.message)}</div>`)); return; }
+
+  const head = el('div', 'panel ' + (d.active ? 'ok-edge' : 'warn-edge'));
+  head.append(el('div', 'bigstate', d.active
+    ? 'On. Real names are replaced before every screenshot is taken.'
+    : 'Off. Screenshots will show whatever the screen shows.'));
+  head.append(el('div', 'muted',
+    'The swap happens in the browser, in the moment before the shutter. ' +
+    'Nothing is sent to the product and nothing about it is changed.' + hint(
+      'A name learned once keeps its placeholder for good, in this capture and ' +
+      'in capture months from now, so the same account is the same Example ' +
+      'Account in every figure and two pictures never contradict each other.')));
+  m.append(head);
+
+  const add = el('div', 'panel');
+  add.append(el('h3', null, 'Never show this name'));
+  add.append(el('div', 'muted',
+    'For a name you know should not appear. It takes effect at the next capture.'));
+  const uid = 'mk' + Math.random().toString(36).slice(2, 6);
+  const g = el('div', 'grid2'); g.style.marginTop = '12px';
+  g.innerHTML = `
+    <div class="field"><label for="${uid}a">This name</label>
+      <input id="${uid}a" placeholder="Northwind Trading"></div>
+    <div class="field"><label for="${uid}b">Show this instead</label>
+      <input id="${uid}b" placeholder="Example Account"></div>`;
+  add.append(g);
+  const row = el('div', 'row');
+  const go = el('button', 'act primary', icon('check') + 'Add the rule');
+  go.onclick = async () => {
+    const a = document.getElementById(uid + 'a').value;
+    const b = document.getElementById(uid + 'b').value;
+    try {
+      const r = await api('/api/masking/literal', { method: 'POST',
+                                                    json: { match: a, with: b } });
+      toast(r.message);
+      drawMasking(holder());
+    } catch (e) { toast(e.message, true); }
+  };
+  row.append(go); add.append(row);
+  m.append(add);
+
+  if (d.literals.length) {
+    const p = el('div', 'panel'); p.style.padding = '0';
+    const tb = el('table', null,
+      '<thead><tr><th>This name</th><th>Is shown as</th><th></th></tr></thead>');
+    const body = el('tbody');
+    d.literals.forEach(x => {
+      const tr = el('tr', null,
+        `<td><code>${esc(x.match)}</code></td><td><code>${esc(x.with)}</code></td>`);
+      const td = el('td');
+      const rm = el('button', 'mini', 'Remove');
+      rm.onclick = async () => {
+        await api('/api/masking/literal', { method: 'POST',
+                                            json: { match: x.match, drop: true } });
+        toast('rule removed'); drawMasking(holder());
+      };
+      td.append(rm); tr.append(td); body.append(tr);
+    });
+    tb.append(body); p.append(tb);
+    m.append(el('h3', 'sub', 'Names you named')); m.append(p);
+  }
+
+  // the rules that catch names nobody listed
+  const auto = el('div', 'panel');
+  auto.append(el('h3', null, 'Rules that catch names automatically'));
+  auto.append(el('div', 'muted',
+    `These need a selector or a pattern, so they live in ${esc(d.path)} where ` +
+    `the notes explaining them are.`));
+  d.columns.forEach(c => auto.append(el('div', null,
+    `Everything under the column <code>${esc(c.header)}</code> becomes ` +
+    `<code>${esc(c.with)}</code>`)));
+  d.patterns.forEach(x => auto.append(el('div', null,
+    `Anything matching <code>${esc(x.name || x.pattern)}</code> becomes ` +
+    `<code>${esc(x.with)}</code>`)));
+  if (!d.columns.length && !d.patterns.length) {
+    auto.append(el('div', 'muted', 'None yet.'));
+  }
+  m.append(auto);
+
+  if (d.mapping.length) {
+    const p = el('div', 'panel'); p.style.padding = '0';
+    const tb = el('table', null,
+      '<thead><tr><th>Real value</th><th>Appears as</th></tr></thead>');
+    const body = el('tbody');
+    d.mapping.forEach(r => body.append(el('tr', null,
+      `<td><code>${esc(r.real ?? r.from ?? '')}</code></td>` +
+      `<td><code>${esc(r.placeholder ?? r.to ?? '')}</code></td>`)));
+    tb.append(body); p.append(tb);
+    m.append(el('h3', 'sub', `Everything replaced so far (${d.mapping.length})`));
+    m.append(el('div', 'muted',
+      'Kept, so the same account is the same placeholder in every figure.'));
     m.append(p);
   }
 }

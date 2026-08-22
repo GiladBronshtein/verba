@@ -818,6 +818,18 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/jobs/running":
                 return self.json({"job": st.jobs.running()})
 
+            if path == "/api/masking":
+                mk = st.masker()
+                return self.json({
+                    "active": mk.active(),
+                    "enabled": bool(getattr(mk, "enabled", True)),
+                    "path": str(st.root / "content" / "masking.yaml"),
+                    "columns": [dict(c) for c in (mk.columns or [])],
+                    "patterns": [dict(x) for x in (mk.patterns or [])],
+                    "literals": [dict(x) for x in (mk.literals or [])],
+                    "mapping": mk.table(),
+                })
+
             if path == "/api/screens":
                 # imported here rather than relied on from module scope: this
                 # handler imports it further down, which makes the name local
@@ -1181,6 +1193,35 @@ class Handler(BaseHTTPRequestHandler):
                     return self.fail(str(e))
                 return self.json({"ok": True,
                                   "message": f"set in {t.face('document').label}"})
+
+            if path == "/api/masking/literal":
+                # The one rule a person adds by hand: "this exact name must
+                # never appear, put that instead". Columns and patterns need a
+                # selector or a regular expression and belong in the file, with
+                # the comments that explain them.
+                import yaml as _yaml
+
+                from ..atomic import write_text as _wt
+                d = data or {}
+                match = str(d.get("match") or "").strip()
+                with_ = str(d.get("with") or "").strip()
+                drop = bool(d.get("drop"))
+                if not match:
+                    return self.fail("which name should never appear?")
+                if not drop and not with_:
+                    return self.fail("what should appear instead?")
+                cfg = st.root / "content" / "masking.yaml"
+                raw = _yaml.safe_load(cfg.read_text(encoding="utf-8")) or {}
+                lits = [x for x in (raw.get("literals") or [])
+                        if str(x.get("match", "")) != match]
+                if not drop:
+                    lits.append({"match": match, "with": with_})
+                raw["literals"] = lits
+                _wt(cfg, _yaml.safe_dump(raw, sort_keys=False, allow_unicode=True))
+                return self.json({"ok": True, "message":
+                                  f"removed the rule for {match!r}" if drop
+                                  else f"{match!r} will be shown as {with_!r} "
+                                       f"from the next capture"})
 
             if path == "/api/theme/use":
                 import re as _re
