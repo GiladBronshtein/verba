@@ -22,7 +22,7 @@
       "verdict": "declined",
       "line": "added tab `Configuration`",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:47",
+      "at": "2026-08-23T00:09:03",
       "change": {
         "kind": "tabs",
         "change": "added",
@@ -70,7 +70,7 @@
       "verdict": "declined",
       "line": "live screen exposes 2 actions but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:47",
+      "at": "2026-08-23T00:09:04",
       "change": {
         "kind": "actions",
         "change": "unmapped",
@@ -86,7 +86,7 @@
       "verdict": "declined",
       "line": "live screen exposes 8 fields but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:48",
+      "at": "2026-08-23T00:09:04",
       "change": {
         "kind": "fields",
         "change": "unmapped",
@@ -102,7 +102,7 @@
       "verdict": "declined",
       "line": "live screen exposes 4 columns but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:49",
+      "at": "2026-08-23T00:09:05",
       "change": {
         "kind": "columns",
         "change": "unmapped",
@@ -118,7 +118,7 @@
       "verdict": "declined",
       "line": "live screen exposes 2 fields but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:50",
+      "at": "2026-08-23T00:09:05",
       "change": {
         "kind": "fields",
         "change": "unmapped",
@@ -134,7 +134,7 @@
       "verdict": "declined",
       "line": "live screen exposes 3 fields but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:50",
+      "at": "2026-08-23T00:09:05",
       "change": {
         "kind": "fields",
         "change": "unmapped",
@@ -150,13 +150,93 @@
       "verdict": "declined",
       "line": "live screen exposes 4 tabs but the section documents none",
       "reason": "applying this added a rule finding",
-      "at": "2026-08-22T01:10:50",
+      "at": "2026-08-23T00:09:06",
       "change": {
         "kind": "tabs",
         "change": "unmapped",
         "label": "",
         "became": "",
         "screen": "settings.workspace"
+      },
+      "by": "auto"
+    },
+    {
+      "id": "59beaa38e3c6be55",
+      "section": "accounts.detail",
+      "verdict": "declined",
+      "line": "added tab `Integrations`",
+      "reason": "applying this added a rule finding",
+      "at": "2026-08-23T00:09:03",
+      "change": {
+        "kind": "tabs",
+        "change": "added",
+        "label": "Integrations",
+        "became": "",
+        "screen": "accounts.detail"
+      },
+      "by": "auto"
+    },
+    {
+      "id": "eaa718984889b96b",
+      "section": "accounts.list",
+      "verdict": "declined",
+      "line": "added column `HEALTH`",
+      "reason": "applying this added a rule finding",
+      "at": "2026-08-23T00:09:04",
+      "change": {
+        "kind": "columns",
+        "change": "added",
+        "label": "HEALTH",
+        "became": "",
+        "screen": "accounts.list"
+      },
+      "by": "auto"
+    },
+    {
+      "id": "3eba1f17e5f506bf",
+      "section": "accounts.list",
+      "verdict": "approved",
+      "line": "removed column `Plan`",
+      "reason": "",
+      "at": "2026-08-23T00:07:49",
+      "change": {
+        "kind": "columns",
+        "change": "removed",
+        "label": "Plan",
+        "became": "",
+        "screen": "accounts.list"
+      },
+      "by": "human"
+    },
+    {
+      "id": "f38983d6938714c1",
+      "section": "accounts.list",
+      "verdict": "approved",
+      "line": "removed column `Status`",
+      "reason": "",
+      "at": "2026-08-23T00:07:49",
+      "change": {
+        "kind": "columns",
+        "change": "removed",
+        "label": "Status",
+        "became": "",
+        "screen": "accounts.list"
+      },
+      "by": "human"
+    },
+    {
+      "id": "f467e4cb5927b13b",
+      "section": "accounts.list",
+      "verdict": "declined",
+      "line": "added column `TIER`",
+      "reason": "applying this added a rule finding",
+      "at": "2026-08-23T00:09:04",
+      "change": {
+        "kind": "columns",
+        "change": "added",
+        "label": "TIER",
+        "became": "",
+        "screen": "accounts.list"
       },
       "by": "auto"
     }

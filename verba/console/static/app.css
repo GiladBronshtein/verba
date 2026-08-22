@@ -1178,11 +1178,16 @@ header.top .scheme button { padding: 5px 7px; }
 
 .flow .stepbody { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
 .flow .stept { font-size: 13px; font-weight: 550; line-height: 1.2; }
+/* One caption is shown, on the step with the work in it, and it is capped so it
+   cannot push Publish off the end of the bar. On a wide screen there is room
+   for the whole sentence, and "4 changes from the liv..." is a caption that has
+   stopped doing its job while still taking the space. */
 .flow .steps-sub {
   font-size: 12px; color: var(--text-3); line-height: 1.25;
   max-width: 132px; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap;
 }
+@media (min-width: 1400px) { .flow .steps-sub { max-width: 215px; } }
 .flow .step.on .stept { color: var(--text); }
 .flow .stepord { display: none; }
 .flow .younow {

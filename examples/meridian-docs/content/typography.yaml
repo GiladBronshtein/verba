@@ -3,8 +3,8 @@
 #   verba fonts             what is installed, and what is served
 #   verba layout            the sheet, the margins, how text is set
 
-document: inter
-console: inter
+document: ibm-plex
+console: ibm-plex
 
 # Page setup. `paper` is the sheet; everything else is in millimetres.
 # Paper may be A4, A5, Letter or Legal. It sets the sheet for the PDF and the

@@ -1,5 +1,5 @@
 {
-  "at": "2026-08-22T01:10:51",
+  "at": "2026-08-23T00:09:08",
   "rounds": 2,
   "errors_before": 0,
   "errors_after": 0,
@@ -42,7 +42,7 @@
     },
     {
       "name": "apply the differences",
-      "did": "7 refused because what they add cannot be described (no way to reach a model. Set ANTHROPIC_API_KEY, or install the Claude Code CLI.)",
+      "did": "10 refused because what they add cannot be described (the writer has no way to reach a model yet. Add a Claude key under Set up, The writer.)",
       "errors_before": 0,
       "errors_after": 0,
       "reverted": false,
@@ -51,6 +51,60 @@
     },
     {
       "name": "use the pictures the crawl took",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "replace pictures nobody has checked",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "look at the pictures nobody has checked",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "read each section against what the crawl saw",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "check each picture is of what its section describes",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "decide what nothing else could settle",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "rewrite what the rules object to",
       "did": "",
       "errors_before": 0,
       "errors_after": 0,
@@ -96,7 +150,7 @@
     },
     {
       "name": "apply the differences",
-      "did": "7 refused because what they add cannot be described (no way to reach a model. Set ANTHROPIC_API_KEY, or install the Claude Code CLI.)",
+      "did": "10 refused because what they add cannot be described (the writer has no way to reach a model yet. Add a Claude key under Set up, The writer.)",
       "errors_before": 0,
       "errors_after": 0,
       "reverted": false,
@@ -105,6 +159,60 @@
     },
     {
       "name": "use the pictures the crawl took",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "replace pictures nobody has checked",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "look at the pictures nobody has checked",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "read each section against what the crawl saw",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "check each picture is of what its section describes",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "decide what nothing else could settle",
+      "did": "",
+      "errors_before": 0,
+      "errors_after": 0,
+      "reverted": false,
+      "note": "",
+      "better": 0
+    },
+    {
+      "name": "rewrite what the rules object to",
       "did": "",
       "errors_before": 0,
       "errors_after": 0,

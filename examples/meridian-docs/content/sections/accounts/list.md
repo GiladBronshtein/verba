@@ -15,10 +15,6 @@ Every account in the workspace, searchable and filterable by status.
   description: The immutable identifier used in exports and in the API
 - column: Region
   description: Where this account's events are processed
-- column: Plan
-  description: Starter, Growth or Scale
-- column: Status
-  description: Live, On hold or Disabled
 - column: OWNER
 ```
 
