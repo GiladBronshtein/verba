@@ -57,14 +57,20 @@ class Shape:
         return cls(sections=out)
 
 
-def broken(before: Shape, after: Shape) -> list[str]:
-    """Everything a step did that no step is allowed to do."""
-    out: list[str] = []
+def faults(before: Shape, after: Shape) -> dict:
+    """{section id: what was done to it}, for everything a step may not do.
 
-    gone = set(before.sections) - set(after.sections)
-    if gone:
-        out.append(f"{len(gone)} section(s) stopped existing: "
-                   f"{', '.join(sorted(gone)[:4])}")
+    Attributed rather than pooled. A step that corrects five sections and
+    damages one should lose the one, and pooling the answer into a flat list
+    meant the whole step went back and four good corrections went with it.
+    """
+    out: dict[str, list[str]] = {}
+
+    def note(sid, msg):
+        out.setdefault(sid, []).append(msg)
+
+    for sid in set(before.sections) - set(after.sections):
+        note(sid, f"{sid} stopped existing")
 
     for sid, was in before.sections.items():
         now = after.sections.get(sid)
@@ -73,17 +79,22 @@ def broken(before: Shape, after: Shape) -> list[str]:
 
         lost = was["figures"] - now["figures"]
         if lost:
-            out.append(f"{sid} lost {len(lost)} figure(s): "
-                       f"{', '.join(sorted(lost)[:3])}")
+            note(sid, f"{sid} lost {len(lost)} figure(s): "
+                      f"{', '.join(sorted(lost)[:3])}")
 
         dropped = was["blocks"] - now["blocks"]
         if dropped:
-            out.append(f"{sid} lost every {', '.join(sorted(dropped))} block")
+            note(sid, f"{sid} lost every {', '.join(sorted(dropped))} block")
 
         if was["words"] and now["words"] < was["words"] * FLOOR:
-            out.append(f"{sid} went from {was['words']} words to {now['words']}")
+            note(sid, f"{sid} went from {was['words']} words to {now['words']}")
 
     return out
+
+
+def broken(before: Shape, after: Shape) -> list[str]:
+    """The same thing, flattened, for callers that only want to know."""
+    return [msg for msgs in faults(before, after).values() for msg in msgs]
 
 
 def tug_of_war(rounds: list[dict]) -> list[str]:

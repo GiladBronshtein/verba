@@ -56,6 +56,16 @@ Every step is a proposal. The rules are counted before and after, and a step
 that raises the count is reverted. This is what makes the loop safe to run
 unattended: the worst case is that nothing changed.
 
+A step that damages one of the several sections it touched loses **that one**,
+not all of them. Reverting the whole step meant one lost table block took four
+good corrections back with it, and the log said "reverted 18 change(s)" over a
+single fault.
+
+Putting a section back is not authoring it, so a revert returns the acceptance
+along with the text. Getting that wrong stripped the badge off eighteen
+sections whose content was fully restored, and the finding count went down,
+which read as progress.
+
 Counting alone is not enough, because some damage does not raise an error
 count. A whole section rewrite that quietly drops half the figures reads as an
 improvement to a counter. So every path that rewrites a whole section is also

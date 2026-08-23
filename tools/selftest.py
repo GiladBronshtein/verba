@@ -1038,17 +1038,34 @@ def t_verified_costs_something():
     sec.meta["status"] = "verified"
     sec.meta["last_verified"] = "2026-07-01"
     sec.save(sec.path)
-    fired = [f for f in lint(Project.load(root))
-             if f.rule == "FRESH-04" and sec.id in f.section]
+    fired = [f for f in lint(Project.load(root)) if f.rule == "FRESH-04"]
     ok(fired, "a section claiming verified with nobody named passed the rules")
+    eq(len(fired), 1,
+       "one migration state was reported once per section rather than once: ")
 
     # a real acceptance carries who and against what, and clears it
     sec.meta = attest(sec.meta, "gilad", "2026-08-23T000000", "2026-08-23")
     sec.save(sec.path)
     ok(is_attested(sec.meta), "the acceptance did not record its evidence")
-    still = [f for f in lint(Project.load(root))
-             if f.rule == "FRESH-04" and sec.id in f.section]
-    eq(still, [], "an accepted section is still reported: ")
+    # one fewer unsigned section than before, and the summary says so
+    after = [f for f in lint(Project.load(root)) if f.rule == "FRESH-04"]
+    before_n = int(fired[0].message.split()[0])
+    if after:
+        eq(int(after[0].message.split()[0]), before_n - 1,
+           "signing a section did not shorten the count: ")
+    else:
+        eq(before_n, 1, "the rule went quiet with sections still unsigned: ")
+
+    # putting a section back is not authoring it: the acceptance returns with
+    # the text, because it was that text a person accepted. Without this one
+    # reverted step stripped the badge off eighteen sections whose content was
+    # fully restored, and the finding count going down read as progress.
+    from verba.attest import demote as _dm
+    signed = "---\nstatus: verified\nverified_by: g\n---\nx"
+    ok("verified" in _dm(signed, "auto", "put back"),
+       "putting a section back stripped the acceptance off the text it restored")
+    ok("review" in _dm(signed, "auto", "review"),
+       "a machine rewrite kept the acceptance")
 
     # and a machine touching it afterwards takes the badge away, at the choke
     # point every machine write in the engine goes through
@@ -1110,7 +1127,17 @@ def t_invariants_catch_what_counting_missed():
        "a lost table block was not caught")
 
     eq(broken(was, Shape(sections={})),
-       ["1 section(s) stopped existing: s"], "a vanished section was not caught: ")
+       ["s stopped existing"], "a vanished section was not caught: ")
+
+    # and every fault is attributed, so a step that damages one section of
+    # five loses that one rather than all five
+    from verba.invariants import faults
+    two = Shape(sections={"good": {"figures": {"a.png"}, "blocks": set(), "words": 100},
+                          "bad": {"figures": {"b.png"}, "blocks": set(), "words": 100}})
+    late = Shape(sections={"good": {"figures": {"a.png"}, "blocks": set(), "words": 98},
+                           "bad": {"figures": set(), "blocks": set(), "words": 100}})
+    eq(sorted(faults(two, late)), ["bad"],
+       "the fault was not attributed to the section that caused it: ")
 
     # two steps taking turns, at a constant count, over two rounds
     rounds = [{"writes": {"a.md": ["decide", "look"]}},

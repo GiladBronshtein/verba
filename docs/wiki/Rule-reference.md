@@ -86,8 +86,11 @@ built in set entirely. See [The writer](The-writer).
 ## The ones worth understanding
 
 **`FRESH-04`, verified with nothing behind it.** The rule that exists because
-the other freshness rules could not tell an acceptance from a stamp. See
-[Sections](Sections).
+the other freshness rules could not tell an acceptance from a stamp. It reports
+**once for the whole document**, with a count, not once per section: every
+section marked verified before signatures were recorded is in the same state
+for the same reason, and thirty-eight identical rows is a list nobody shortens
+by reading it. `verba accept` shortens it. See [Sections](Sections).
 
 **Changing a rule is itself checked.** `tools/rule_baseline.py` holds every
 rule against a corpus of known documents and prints exactly what a change stops

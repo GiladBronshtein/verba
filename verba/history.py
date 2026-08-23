@@ -84,7 +84,7 @@ class History:
             return None
         if path is not None and str(path).endswith(".md"):
             from .attest import demote
-            demoted = demote(after, actor)
+            demoted = demote(after, actor, action)
             if demoted != after:
                 after = demoted
                 path.write_text(after, encoding="utf-8")

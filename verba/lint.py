@@ -269,6 +269,7 @@ def remedy(rule: str) -> dict:
 def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
     tenant_terms = project.tenant_terms()
     findings: list[Finding] = []
+    unsigned: list[str] = []
 
     # Design decisions are held to the same standard as content rules. A
     # decision that only lives in a document is a note; one that fails a build
@@ -398,11 +399,7 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         # stamped on the same day, because a date was present and nothing asked
         # where the date came from.
         if sec.status == "verified" and not is_attested(sec.meta):
-            add(Finding("FRESH-04", WARN, sid,
-                        "says verified, but nobody is named and no capture is "
-                        "cited",
-                        "Marking it verified again records who accepted it and "
-                        "which crawl they accepted it against."))
+            unsigned.append(sid)
         if not lv:
             add(Finding("FRESH-01", WARN, sid, "no last_verified date"))
         else:
@@ -417,6 +414,21 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
 
         if sec.status not in ("draft", "review", "verified", "stale"):
             add(Finding("META-01", WARN, sid, f"unknown status {sec.status!r}"))
+
+    # One finding, not one per section. Every section marked verified before
+    # signatures were recorded is in the same state for the same reason, and
+    # printing it thirty-eight times is a list nobody can shorten by reading
+    # it: the same shape as the eighteen unreachable pictures this project
+    # spent a day removing. Signing them is real work with a real command, and
+    # it belongs behind one line saying how much of it is left.
+    if unsigned:
+        add(Finding("FRESH-04", WARN, "",
+                    f"{len(unsigned)} section(s) say verified without saying by "
+                    f"whom or against which crawl",
+                    "Read and sign them with: verba accept. Each signature "
+                    "records who made it and the capture they read it against, "
+                    "and is dropped automatically the next time anything but a "
+                    "person changes that section."))
 
     # -- assets -----------------------------------------------------------
     used: dict[str, list[str]] = {}

@@ -26,6 +26,13 @@ from pathlib import Path
 MACHINE_ACTORS = {"auto", "assist", "drift", "capture", "system", "sweep",
                   "tidy", "heal"}
 
+# Undoing is not authoring. Putting a section back the way it was returns its
+# acceptance along with its text, because the person accepted that text and it
+# is the text that is there again. Without this, one reverted step stripped the
+# badge off eighteen sections whose content was fully restored, and nothing in
+# the log said so: the count went down and it read as progress.
+RESTORING = {"put back", "restore", "revert", "undo"}
+
 
 def whoami() -> str:
     """A name to put on an acceptance.
@@ -69,14 +76,14 @@ def attest(meta: dict, who: str, capture: str, when: str) -> dict:
     return meta
 
 
-def demote(text: str, actor: str) -> str:
+def demote(text: str, actor: str, action: str = "") -> str:
     """Drop a verified section back to review after a machine changed it.
 
     Text in, text out, and only the three lines that make the claim. Parsing
     the section and writing it back would reformat a file somebody is reading
     in a diff, over a change they did not make.
     """
-    if actor not in MACHINE_ACTORS:
+    if actor not in MACHINE_ACTORS or action in RESTORING:
         return text
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].strip() != "---":

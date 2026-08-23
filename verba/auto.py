@@ -329,7 +329,7 @@ class Auto:
         taken as well, and a step that changes it in a way no step is allowed
         to is put back regardless of what the count says.
         """
-        from .invariants import Shape, broken
+        from .invariants import Shape, faults
         before = self._errors()
         step = Step(name=name, errors_before=before)
         try:
@@ -351,7 +351,25 @@ class Auto:
             self.steps.append(step)
             return
 
-        damage = broken(shape, Shape.of(self._project()))
+        hurt = faults(shape, Shape.of(self._project()))
+        damage = [m for msgs in hurt.values() for m in msgs]
+        if hurt and step.errors_after <= step.errors_before:
+            # Only the sections it damaged. A step that corrects five and
+            # damages one should lose the one: reverting the whole step took
+            # four good corrections back with the bad one, and the log said
+            # "reverted 18 change(s)" over a single lost table block.
+            undone = self._restore(snapshot, only=set(hurt))
+            step.note = "put back " + ", ".join(sorted(hurt))
+            emit(f"  {name}: {step.did}")
+            emit(f"    put back {undone} change(s) in {len(hurt)} section(s). "
+                 f"No rule would have caught this:")
+            for line in damage[:4]:
+                emit(f"      {line}")
+            emit("    everything else this step did was kept.")
+            step.errors_after = self._errors()
+            self.steps.append(step)
+            return
+
         if damage or step.errors_after > step.errors_before:
             # A pass that introduces findings is a pass that made the document
             # worse, whatever it believed it was doing. So is one that took
@@ -773,9 +791,17 @@ class Auto:
             if not inv:
                 continue                       # nothing to hold it against
 
+            # Not the ones only a person can close. Handing the model a
+            # finding it cannot act on makes it write about the finding: five
+            # of the reports in one run opened with "FRESH-04: status is
+            # verified but no reviewer is named", which is the rule restated
+            # back at the person who has already read it, dressed as a
+            # correction to their section.
             findings = [{"rule": f.rule, "level": f.level, "message": f.message,
                          "detail": f.detail}
-                        for f in lint(proj) if sec.id in (f.section or "")]
+                        for f in lint(proj)
+                        if sec.id in (f.section or "")
+                        and not _is_a_persons_signature(f)]
             prompt = assist.build_prompt("review", proj, sec, inv, [], findings, "")
             res = assist.run_model(prompt, log=None)
             if not res.ok:
@@ -1357,8 +1383,12 @@ class Auto:
                 pass
         return out
 
-    def _restore(self, snapshot: dict) -> int:
-        """Put back exactly what was there, and say so in the history."""
+    def _restore(self, snapshot: dict, only: set | None = None) -> int:
+        """Put back exactly what was there, and say so in the history.
+
+        `only` limits it to named sections, so a step that damaged one of the
+        several it touched loses that one rather than all of them.
+        """
         if not snapshot:
             return 0
         from .history import History
@@ -1369,6 +1399,8 @@ class Auto:
         undone = 0
         for path, text in snapshot.items():
             try:
+                if only is not None and by_path.get(path, path.stem) not in only:
+                    continue
                 if not path.exists() or path.read_text(encoding="utf-8") == text:
                     continue
                 current = path.read_text(encoding="utf-8")
