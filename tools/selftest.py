@@ -1143,6 +1143,11 @@ def t_invariants_catch_what_counting_missed():
     rounds = [{"writes": {"a.md": ["decide", "look"]}},
               {"writes": {"a.md": ["look", "decide"]}}]
     ok(tug_of_war(rounds), "two steps undoing each other went unnoticed")
+    # and the loop must actually call it. It was written, tested in isolation,
+    # and never wired in, which is a detector that detects nothing.
+    src = (Path(__file__).resolve().parents[1] / "verba" / "auto.py").read_text()
+    ok("tug_of_war(" in src and "round_writes" in src,
+       "the tug-of-war detector is not called by the loop")
     eq(tug_of_war([{"writes": {"a.md": ["decide"]}}] * 2), [],
        "one step writing one file twice was called a fight: ")
     return "figures, blocks, word floor, whole sections, and steps taking turns"

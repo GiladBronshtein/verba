@@ -1673,9 +1673,11 @@ class Handler(BaseHTTPRequestHandler):
             for s in sec.screens:
                 if s in data.get("screens", {}):
                     inv[s] = data["screens"][s]
+        from ..attest import signature
         return self.json({
             "id": sid, "number": node.number if node else "",
             "title": sec.title, "meta": sec.meta,
+            "signature": signature(st.root, sid, sec.meta),
             "markdown": sec.to_markdown(),
             "path": str(sec.path.relative_to(st.root)) if sec.path else "",
             "screens": sec.screens,

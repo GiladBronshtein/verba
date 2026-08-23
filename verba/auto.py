@@ -255,6 +255,7 @@ class Auto:
     root: Path
     steps: list = field(default_factory=list)
     for_you: list = field(default_factory=list)
+    round_writes: list = field(default_factory=list)
     rounds_run: int = 0
 
     # ------------------------------------------------------------------
@@ -275,6 +276,7 @@ class Auto:
 
         for r in range(1, rounds + 1):
             self.rounds_run = r
+            self.round_writes.append({"round": r, "writes": {}})
             emit("")
             emit(f"round {r}")
 
@@ -307,6 +309,21 @@ class Auto:
             # have a dozen differences from the live system sitting unapplied.
             # The loop stops when a round does nothing, which is the only
             # honest definition of finished.
+            # Two steps taking turns over one section, at a flat rule count,
+            # which is the state nothing else in the loop can see: each step is
+            # measured against the count, and the count is exactly what the two
+            # of them are preserving between them.
+            from .invariants import tug_of_war
+            for line in tug_of_war(self.round_writes):
+                emit(f"  two steps are taking turns: {line}")
+                self.for_you.append({
+                    "what": f"two steps are undoing each other: {line}",
+                    "why": "Each is right on its own and together they never "
+                           "settle. The rule count does not move while they do "
+                           "it, so nothing else catches it.",
+                    "do": "Worth an issue. Nothing here can decide which of "
+                          "the two is wrong."})
+
             did_something = len([x for x in self.steps if x.did]) > done_before
             after = self._errors()
             if not did_something:
@@ -351,7 +368,17 @@ class Auto:
             self.steps.append(step)
             return
 
-        hurt = faults(shape, Shape.of(self._project()))
+        now = Shape.of(self._project())
+        # Which sections this step actually changed. Recorded per round, so two
+        # steps taking turns over one file can be seen: the rule count is flat
+        # while they do it, which is why nothing else notices.
+        touched = [sid for sid, was in shape.sections.items()
+                   if now.sections.get(sid) != was]
+        if self.round_writes:
+            for sid in touched:
+                self.round_writes[-1].setdefault("writes", {}).setdefault(
+                    sid, []).append(name)
+        hurt = faults(shape, now)
         damage = [m for msgs in hurt.values() for m in msgs]
         if hurt and step.errors_after <= step.errors_before:
             # Only the sections it damaged. A step that corrects five and

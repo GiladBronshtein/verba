@@ -100,7 +100,9 @@ the people who have one. See [The writer](The-writer).
 <img src="https://raw.githubusercontent.com/GiladBronshtein/verba/main/docs/img/console-section.png" alt="A section open">
 
 The outline down the side, what is outstanding at the top, the source and its
-preview together. You can recapture just this section's screens without leaving
+preview together. A section that has lost its signature says how many changes
+were made since, by which step, and opens the diff of the first one, rather
+than showing a status of "review" with no explanation and one button. You can recapture just this section's screens without leaving
 the page, which is the fastest loop there is when you are writing.
 
 ## Fix what can be fixed

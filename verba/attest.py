@@ -106,3 +106,58 @@ def demote(text: str, actor: str, action: str = "") -> str:
                 continue        # the acceptance was of the previous text
         out.append(line)
     return "".join(out) if changed else text
+
+
+def signature(root: Path | str, section_id: str, meta: dict) -> dict:
+    """Whether this section carries a signature, and if not, what happened.
+
+    "review" on its own tells nobody anything. A section sitting in review with
+    a verification date beside it and no explanation is the reader's problem to
+    solve with no information: they can see something is wrong and not what,
+    and the only control on the page marks it verified, which is the one thing
+    they cannot responsibly do without knowing what changed.
+
+    So the reason is read back out of History: who signed it last, and every
+    machine change since. That is exactly what needs reading before signing
+    again, and it is already recorded.
+    """
+    import json
+    root = Path(root)
+    signed = bool(meta.get("status") == "verified" and is_attested(meta))
+    out = {
+        "signed": signed,
+        "by": str(meta.get("verified_by", "") or ""),
+        "against": str(meta.get("verified_against", "") or ""),
+        "when": str(meta.get("last_verified", "") or ""),
+        "since": [],
+        "ever": False,
+    }
+    log = root / ".verba" / "history" / "log.jsonl"
+    if not log.exists():
+        return out
+    rows = []
+    for line in log.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        if r.get("section") == section_id:
+            rows.append(r)
+
+    last_signed = None
+    for i, r in enumerate(rows):
+        if r.get("actor") not in MACHINE_ACTORS and r.get("action") in (
+                "accept", "verify"):
+            last_signed, out["ever"] = i, True
+    if last_signed is None:
+        return out
+    for r in rows[last_signed + 1:]:
+        if r.get("actor") in MACHINE_ACTORS and r.get("action") not in RESTORING:
+            out["since"].append({
+                "at": r.get("at", ""), "actor": r.get("actor", ""),
+                "action": r.get("action", ""), "note": (r.get("note") or "")[:200],
+                "id": r.get("id", ""),
+            })
+    return out

@@ -127,6 +127,12 @@ behind it drops the section back to `review`**, at the one point in the engine
 every machine write passes through, because a person verified the section they
 read and not the one a model rewrote after them.
 
+When a section loses its signature the console says **why**: how many changes
+were made since you last signed it, by which step, and what each one did, with
+a button that opens the diff of the first one. "review" on its own tells nobody
+anything, and the only control on the page marks it verified, which is the one
+thing a reader cannot responsibly press without knowing what changed.
+
 This is deliberately expensive. On the first real document built with this
 engine, all thirty-eight sections said verified, thirty-five carried the same
 bulk date, and History recorded that 2.8% of the changes to that document had a

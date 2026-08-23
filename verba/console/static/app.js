@@ -3421,7 +3421,13 @@ function sectionTodo(d, meta) {
   const drift = (d.drift || []).filter(c => !c.decided);
   const lintErrors = (meta.lint || []).filter(f => f.level === 'error');
   const stale = meta.status === 'stale';
-  const outstanding = fresh.length + drift.length + lintErrors.length + (stale ? 1 : 0);
+  // An unsigned section is outstanding. It used to be counted only when
+  // somebody had marked it stale by hand, so a section a model had rewritten
+  // after its last signature reported "Nothing outstanding" above a badge
+  // saying review.
+  const unsigned = !(d.signature || {}).signed;
+  const outstanding = fresh.length + drift.length + lintErrors.length
+    + (stale || unsigned ? 1 : 0);
 
   p.classList.add(outstanding ? 'warn-edge' : 'accent');
   p.append(el('h3', null, (outstanding ? icon('alert') : icon('check')) +
@@ -3439,6 +3445,7 @@ function sectionTodo(d, meta) {
       row.append(b);
     }
     list.append(row);
+    return row;
   };
 
   item(fresh.length > 0,
@@ -3479,16 +3486,63 @@ function sectionTodo(d, meta) {
       lintErrors.map(f => f.message).join('; '), null, null);
   }
 
-  item(stale,
-    stale ? 'Marked stale' : `Verified ${meta.last_verified || 'at some point'}`,
-    stale ? (meta.notes || 'Someone flagged this as needing a look.') : '',
-    'Mark verified', async () => {
+  // A date is not a signature, and "review" on its own tells nobody anything.
+  // This row used to read "Verified 2026-08-23" off a date while the section
+  // sat in review with no explanation, so the page said it was fine, said it
+  // needed review, and offered one button the reader could not responsibly
+  // press without knowing what had changed.
+  const sig = d.signature || {};
+  const since = sig.since || [];
+  const needs = stale || !sig.signed;
+  let what, why;
+  if (stale) {
+    what = 'Marked stale';
+    why = meta.notes || 'Someone flagged this as needing a look.';
+  } else if (sig.signed) {
+    what = `Signed by ${sig.by} on ${sig.when}`;
+    why = sig.against ? `against the crawl of ${sig.against}` : '';
+  } else if (since.length) {
+    what = `${since.length} change(s) since you last signed this`;
+    why = since.slice(0, 3).map(c => `${c.actor}: ${c.note || c.action}`).join(' · ')
+        + (since.length > 3 ? ` · and ${since.length - 3} more` : '');
+  } else if (sig.ever) {
+    what = 'Signed, then the signature was dropped';
+    why = 'Read it once more and sign again.';
+  } else {
+    what = 'Nobody has signed this';
+    why = sig.when
+      ? `It carries the date ${sig.when}, but no name and no crawl, so nothing `
+        + `records who checked it.`
+      : 'Read it against its screen, then sign.';
+  }
+
+  const row = item(needs, what, why,
+    since.length ? 'Show what changed' : 'Mark verified',
+    async () => {
+      // Straight to the diff of the first change made after the last
+      // signature. That is the thing to read, and making somebody find it in a
+      // table of ninety-nine revisions is how they end up signing unread.
+      if (since.length) return showRevision(d.id, since[0]);
       try {
         const r = await api(`/api/section/${encodeURIComponent(d.id)}/verify`,
           { method: 'POST', json: {} });
         toast(r.message); await refresh(); openSection(d.id);
       } catch (e) { toast(e.message, true); }
     });
+  // Both, when there is something to read first: seeing the change and
+  // accepting it are two acts, and collapsing them into one button is how a
+  // signature stops meaning anything.
+  if (needs && since.length && row) {
+    const sign = el('button', 'mini', 'Read it, then sign');
+    sign.onclick = async () => {
+      try {
+        const r = await api(`/api/section/${encodeURIComponent(d.id)}/verify`,
+          { method: 'POST', json: {} });
+        toast(r.message); await refresh(); openSection(d.id);
+      } catch (e) { toast(e.message, true); }
+    };
+    row.append(sign);
+  }
 
   p.append(list);
   if (!outstanding) {
@@ -3508,7 +3562,9 @@ function drawSection(m) {
   head.append(el('div', null,
     `<h2 class="page">${esc(d.number)} ${esc(d.title)}</h2>
      <div class="muted">${esc(d.path)} · <span class="chip ${meta.status}">${esc(meta.status)}</span>
-     ${meta.last_verified ? ' verified ' + esc(meta.last_verified) : ''}
+     ${(d.signature || {}).signed
+        ? ' signed by ' + esc(d.signature.by) + ' on ' + esc(d.signature.when)
+        : (meta.last_verified ? ' dated ' + esc(meta.last_verified) + ', unsigned' : '')}
      ${meta.changes ? ' &middot; ' + meta.changes + ' change(s) recorded' : ''}</div>`));
   const acts = el('div', 'row');
   const recap = el('button', 'act primary', 'Recapture from live system');
@@ -3609,11 +3665,20 @@ function drawSection(m) {
     m.append(rp);
   }
 
-  if (d.drift.length) {
+  // Only the ones still open. A list headed "Differences against the live
+  // system" whose every row carries an "applied" chip is a settled record
+  // filed under a heading that says otherwise, and it sat directly under a
+  // panel reading "No open differences".
+  const openDrift = d.drift.filter(c => !c.decided);
+  const settled = d.drift.length - openDrift.length;
+  if (openDrift.length || settled) {
     const dz = el('div', 'drift');
-    dz.append(el('div', 'hd', '<b>Differences against the live system</b>'));
+    dz.append(el('div', 'hd', openDrift.length
+      ? '<b>Differences against the live system</b>'
+      : `<b>Settled differences</b> <span class="muted">${settled} already `
+        + `applied or declined, nothing open</span>`));
     const ul = el('ul');
-    d.drift.forEach(c => {
+    (openDrift.length ? openDrift : d.drift).forEach(c => {
       const li = el('li');
       li.append(el('span', null, esc(c.line)));
       if (c.decided) {

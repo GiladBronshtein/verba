@@ -61,6 +61,11 @@ not all of them. Reverting the whole step meant one lost table block took four
 good corrections back with it, and the log said "reverted 18 change(s)" over a
 single fault.
 
+At the end of every round the loop checks whether two steps wrote the same
+section in both of the last two rounds. That is two steps taking turns, and it
+is invisible to everything else, because the rule count is exactly what the
+two of them are preserving between them.
+
 Putting a section back is not authoring it, so a revert returns the acceptance
 along with the text. Getting that wrong stripped the badge off eighteen
 sections whose content was fully restored, and the finding count went down,
