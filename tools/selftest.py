@@ -1435,6 +1435,62 @@ def t_failures_are_explained():
     return "no project, broken YAML, half-written JSON and a hashed hex all explained"
 
 
+@check("reading the history does not rewrite it")
+def t_recording_is_not_authoring():
+    """Four faults in yesterday's own machinery, all wired to the wrong thing.
+
+    The worst: History.seed() records a baseline for every section the first
+    time history is opened, with actor="system". system is a machine actor, so
+    the demotion hook fired and the file was rewritten. `verba history` and
+    merely starting the console therefore stripped every signature in the
+    document, from a read-only command, with nothing said.
+    """
+
+    from verba.attest import demote
+    from verba.auto import _picture_digest
+    from verba.history import History
+    from verba.project import Project
+
+    root = fresh()
+    (root / "capture" / "2026-01-01T000000").mkdir(parents=True, exist_ok=True)
+    (root / "capture" / "2026-01-01T000000" / "inventory.json").write_text("{}")
+    proj = Project.load(root)
+    sec = next(iter(proj.sections.values()))
+    body = sec.path.read_text(encoding="utf-8")
+    signed = body.replace("status: draft", "status: verified") + ""
+    if "status: verified" not in signed:
+        signed = signed.replace("---\n", "---\nstatus: verified\n", 1)
+    signed = signed.replace("status: verified",
+                            "status: verified\nverified_by: A Person\n"
+                            "verified_against: 2026-01-01T000000", 1)
+    sec.path.write_text(signed, encoding="utf-8")
+
+    History(root).seed(Project.load(root).sections)
+    after = sec.path.read_text(encoding="utf-8")
+    ok("status: verified" in after,
+       "seeding the history stripped a signature from a read-only command")
+    ok("verified_by" in after, "the signature's evidence was removed by a baseline")
+
+    # a real machine edit still demotes
+    ok("review" in demote(signed, "auto", "review"), "a model edit kept the badge")
+    # and a note is a person asking, but the edit answering it is a model's
+    ok("review" in demote(signed, "note", "edit"),
+       "an edit written from a note kept a signature given to different text")
+
+    # the fingerprint has to look where screenshots are
+    shots = root / "content" / "assets" / "screenshots"
+    shots.mkdir(parents=True, exist_ok=True)
+    (shots / "a-real-shot.png").write_bytes(PNG)
+    ok(_picture_digest(root, "a-real-shot.png"),
+       "a screenshot has no fingerprint, so its verdict can never expire")
+
+    # the meter does not outlive the run that set it
+    from verba.console.assist import meter, metering
+    metering(None)
+    eq(meter(), None, "a finished run left its ceiling in place for the process: ")
+    return "a baseline keeps the signature, a model edit drops it, shots are fingerprinted"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1480,6 +1536,7 @@ def main() -> int:
              t_cover_and_duplicate_content,
              t_the_doors_the_audit_found,
              t_failures_are_explained,
+             t_recording_is_not_authoring,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,

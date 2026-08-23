@@ -24,14 +24,18 @@ from pathlib import Path
 # Actors whose changes are the machine's own. `human` and `note` are a person
 # at the keyboard; everything else is the loop, the crawl or the model.
 MACHINE_ACTORS = {"auto", "assist", "drift", "capture", "system", "sweep",
-                  "tidy", "heal"}
+                  "tidy", "heal",
+                  # A note is a person asking for something. The edit that
+                  # answers it is still a model's, and a signature given before
+                  # that edit was given to different text.
+                  "note"}
 
 # Undoing is not authoring. Putting a section back the way it was returns its
 # acceptance along with its text, because the person accepted that text and it
 # is the text that is there again. Without this, one reverted step stripped the
 # badge off eighteen sections whose content was fully restored, and nothing in
 # the log said so: the count went down and it read as progress.
-RESTORING = {"put back", "restore", "revert", "undo"}
+RESTORING = {"put back", "restore", "revert", "undo", "baseline"}
 
 
 def whoami() -> str:

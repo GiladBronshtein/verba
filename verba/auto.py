@@ -138,7 +138,12 @@ MATCHES = "review/picture-match.json"
 def _picture_digest(root, name: str) -> str:
     """A short fingerprint of the picture a verdict was about."""
     import hashlib
-    for folder in ("content/assets", "content/assets/icons"):
+    # screenshots/ is where the pictures actually are. Without it every
+    # screenshot verdict was written with an empty fingerprint, and an empty
+    # fingerprint is trusted forever, so the expiry added for exactly this was
+    # inert on 39 of the 43 pictures in the real document.
+    for folder in ("content/assets/screenshots", "content/assets",
+                   "content/assets/icons"):
         path = Path(root) / folder / name
         if path.exists():
             return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
@@ -332,7 +337,15 @@ class Auto:
             emit(f"  round {r} done, {after} finding(s) left")
 
         self._collect_what_is_left(emit)
-        return self.report(start, emit)
+        try:
+            return self.report(start, emit)
+        finally:
+            # The console is one long-lived process running jobs in threads. A
+            # meter left in place after a run that reached its ceiling refused
+            # every later request from the writer for the rest of the session,
+            # with a message about a limit belonging to a job that had finished.
+            from .console.assist import metering as _m
+            _m(None)
 
     # ------------------------------------------------------------------
     def _step(self, name: str, fn, emit) -> None:
@@ -986,7 +999,13 @@ class Auto:
             return False
 
         lines = before.splitlines(keepends=True)
-        start = next((i for i, ln in enumerate(lines) if name in ln), None)
+        # Only the line that names this crop AS a name. Searching the whole file
+        # for any line containing the string matched a YAML anchor, a comment or
+        # another screen's shot first, and the deletion then took whatever was
+        # under that instead, while the log named the screen it meant to touch.
+        start = next((i for i, ln in enumerate(lines)
+                      if ln.strip().startswith(("- name:", "name:"))
+                      and ln.split(":", 1)[-1].strip().strip("\"'") == name), None)
         if start is None:
             return False
         # A list item is its own dash line plus every deeper line under it.
