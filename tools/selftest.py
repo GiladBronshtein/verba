@@ -1359,7 +1359,80 @@ def t_the_doors_the_audit_found():
         pass
     m.required = False
     eq(m.apply(None), [], "masking that is not required refused anyway: ")
-    return "the sign-in browser is guarded, popups are guarded, empty masking refuses"
+    # a Service Worker's requests are not routed unless the context blocks them
+    for mod, n in ((cap_mod, 3), (si, 2)):
+        src = inspect.getsource(mod)
+        ok(src.count('service_workers') >= n,
+           f"a browser context in {mod.__name__} does not block service workers")
+
+    # the POST allowlist is for POST
+    from verba.readonly import Guard
+    g = Guard(allow_post_matching=["*/graphql"])
+    class R:
+        def __init__(s, m): s.method, s.url = m, "https://x.test/graphql"
+    class Route:
+        def __init__(s): s.acted = None
+        def continue_(s): s.acted = "continue"
+        def abort(s): s.acted = "abort"
+    g.lock()
+    r = Route(); g._handle(r, R("POST"))
+    eq(r.acted, "continue", "an allowlisted POST was blocked: ")
+    r = Route(); g._handle(r, R("DELETE"))
+    eq(r.acted, "abort", "a DELETE to an allowlisted URL was permitted: ")
+
+    return ("the sign-in browser is guarded, popups and service workers are guarded, "
+            "empty masking refuses, and the POST allowlist is only for POST")
+
+
+@check("a mistake in a file the user was told to edit is a sentence, not a stack")
+def t_failures_are_explained():
+    """Fourteen distinct tracebacks were reproducible in a temp project.
+
+    The engine is full of carefully worded refusals and none of them were
+    reached by the faults people actually hit: no project yet, a colon inside
+    an unquoted title, a registry.json left half written by a killed capture.
+    Those arrived as Python internals, which tell a writer nothing except that
+    the tool is broken.
+    """
+    import subprocess
+
+    repo = Path(__file__).resolve().parents[1]
+
+    def verba(args, **kw):
+        return subprocess.run([sys.executable, "-m", "verba"] + args,
+                              capture_output=True, text=True, cwd=str(repo), **kw)
+
+    nothing = Path(tempfile.mkdtemp())
+    r = verba(["--root", str(nothing), "status"])
+    ok("Traceback" not in r.stderr, "no project at all is still a traceback")
+    ok("no document" in r.stdout, f"the message does not say what is wrong: {r.stdout[:120]}")
+
+    root = fresh()
+    (root / "content" / "doc.yaml").write_text(
+        (root / "content" / "doc.yaml").read_text() + "\nbroken: [unterminated\n")
+    r = verba(["--root", str(root), "status"])
+    ok("Traceback" not in r.stderr, "broken YAML is still a traceback")
+    ok("YAML" in r.stdout and "line" in r.stdout,
+       f"the message does not name the fault or the line: {r.stdout[:140]}")
+
+    other = fresh()
+    (other / "content" / "assets" / "registry.json").write_text('{"half":')
+    r = verba(["--root", str(other), "status"])
+    ok("Traceback" not in r.stderr, "a half-written JSON is still a traceback")
+    ok("JSON" in r.stdout, f"the message does not name the fault: {r.stdout[:140]}")
+
+    # and the escape hatch still exists for anyone debugging
+    import os as _os
+    env = dict(_os.environ, VERBA_TRACEBACK="1")
+    r = verba(["--root", str(other), "status"], env=env)
+    ok("Traceback" in r.stderr, "VERBA_TRACEBACK=1 no longer shows the traceback")
+
+    # a brand colour pasted the way every design tool hands it over
+    from verba.theme import Theme
+    eq(Theme._hex("#3137DB"), "3137DB", "a hex with a hash was not accepted: ")
+    eq(Theme._hex("#abc"), "AABBCC", "a three-digit hex was not expanded: ")
+    eq(Theme._hex("notacolour"), "notacolour", "a non-colour was mangled: ")
+    return "no project, broken YAML, half-written JSON and a hashed hex all explained"
 
 
 @check("a rule cannot quietly stop reporting")
@@ -1406,6 +1479,7 @@ def main() -> int:
              t_themes_ship_and_never_stop_a_build,
              t_cover_and_duplicate_content,
              t_the_doors_the_audit_found,
+             t_failures_are_explained,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,

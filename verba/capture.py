@@ -329,7 +329,11 @@ class Capture:
 
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=headless)
-            ctx_args = {"viewport": VIEWPORT, "device_scale_factor": 1}
+            # A Service Worker's requests are not routed unless the context
+            # blocks them, so a PWA-shaped product could have written
+            # straight through the guard without touching a Page at all.
+            ctx_args = {"viewport": VIEWPORT, "device_scale_factor": 1,
+                        "service_workers": "block"}
             if have_session:
                 ctx_args["storage_state"] = state
             ctx = browser.new_context(**ctx_args)
@@ -354,7 +358,8 @@ class Capture:
                         browser.close()
                         browser = pw.chromium.launch(headless=False)
                     ctx = browser.new_context(viewport=VIEWPORT,
-                                              device_scale_factor=1)
+                                              device_scale_factor=1,
+                                              service_workers="block")
                     ctx.on("page", lambda p: self.guard.attach(p, log=emit))
                     page = ctx.new_page()
                     page.set_default_timeout(DEFAULT_TIMEOUT)
@@ -388,7 +393,8 @@ class Capture:
                         # then documents the wrong screen entirely.
                         emit(f"  {screen.id}: using a signed-out browser")
                         fresh = browser.new_context(viewport=VIEWPORT,
-                                                    device_scale_factor=1)
+                                                    device_scale_factor=1,
+                                                    service_workers="block")
                         fresh.on("page", lambda p: self.guard.attach(p, log=emit))
                         fpage = fresh.new_page()
                         fpage.set_default_timeout(DEFAULT_TIMEOUT)

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -1631,9 +1632,71 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+# What a failure is actually about, said in the words of the thing that failed.
+# The engine is full of carefully worded refusals and none of them were reached
+# by the faults people actually hit: a project that is not there, a file they
+# were invited to edit and mistyped, a half-written JSON left by a killed run.
+# Those arrived as a stack trace, which tells a writer nothing except that the
+# tool is broken.
+def _explain(e: Exception, root) -> str:
+    import json as _json
+
+    import yaml as _yaml
+    where = Path(root).resolve()
+    if isinstance(e, _yaml.YAMLError):
+        mark = getattr(e, "problem_mark", None)
+        spot = f" at line {mark.line + 1}" if mark is not None else ""
+        name = getattr(mark, "name", "") if mark is not None else ""
+        which = f" in {name}" if name and name != "<unicode string>" else ""
+        return (f"a YAML file could not be read{which}{spot}: "
+                f"{getattr(e, 'problem', e)}.\n"
+                f"The usual cause is a colon inside an unquoted value, or an "
+                f"indent that does not line up.")
+    if isinstance(e, _json.JSONDecodeError):
+        return (f"a stored file is not valid JSON: {e.msg} at line {e.lineno}.\n"
+                f"If a capture or a build was interrupted, the file it was "
+                f"writing may be half finished. It is safe to delete "
+                f"content/assets/registry.json or review/*.json and let the "
+                f"next run rebuild it.")
+    if isinstance(e, FileNotFoundError):
+        missing = getattr(e, "filename", "") or ""
+        if missing.endswith("doc.yaml") or not (where / "content" / "doc.yaml").exists():
+            return (f"there is no document in {where}.\n"
+                    f"Start one with: verba new, or point at an existing one "
+                    f"with --root.")
+        return f"a file this needs is not there: {missing}"
+    if isinstance(e, KeyError):
+        return (f"content/doc.yaml has no {e} block, and it is needed.\n"
+                f"A document needs product: with a name, and document: with a "
+                f"title.")
+    if isinstance(e, TypeError) and "unexpected keyword" in str(e):
+        return (f"a settings file has a key nothing understands: {e}.\n"
+                f"Remove it, or check the spelling against the comments in the "
+                f"file.")
+    if isinstance(e, AttributeError) and "NoneType" in str(e):
+        return ("a block in one of the YAML files under content/ is present but "
+                "empty, and something expected values under it.\n"
+                "An empty block reads as nothing at all. Delete the key, or "
+                "put its contents back.")
+    return f"{type(e).__name__}: {e}"
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except KeyboardInterrupt:
+        print("\nstopped.")
+        return 130
+    except SystemExit:
+        raise
+    except Exception as e:
+        if os.environ.get("VERBA_TRACEBACK"):
+            raise
+        print(f"\nthis could not run: {_explain(e, getattr(args, 'root', '.'))}")
+        print("\nFor the full Python traceback, run it again with "
+              "VERBA_TRACEBACK=1.")
+        return 1
 
 
 if __name__ == "__main__":

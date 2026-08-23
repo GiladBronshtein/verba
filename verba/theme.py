@@ -116,11 +116,28 @@ class Theme:
                              f"{', '.join(available(root))}")
         return cls._from(yaml.safe_load(path.read_text(encoding="utf-8")) or {}, name)
 
+    @staticmethod
+    def _hex(value):
+        """A colour, however a person wrote it down.
+
+        content/theme.yaml invites the reader to paste their brand colour, and
+        every design tool on earth hands it over with a hash on the front.
+        Doing that reported no lint error and then died inside python-docx with
+        `invalid literal for int() with base 16: '#3'`.
+        """
+        if isinstance(value, str):
+            v = value.strip().lstrip("#").strip()
+            if len(v) == 3 and all(c in "0123456789abcdefABCDEF" for c in v):
+                v = "".join(c * 2 for c in v)     # #abc is a colour too
+            return v.upper() if len(v) == 6 and all(
+                c in "0123456789abcdefABCDEF" for c in v) else value
+        return value
+
     @classmethod
     def _from(cls, data: dict, name: str) -> "Theme":
         fields = {f for f in cls.__dataclass_fields__ if f not in
                   ("note_marks", "note_accent")}
-        kw = {k: v for k, v in data.items() if k in fields}
+        kw = {k: cls._hex(v) for k, v in data.items() if k in fields}
         kw["name"] = data.get("name", name)
         marks = dict(DEFAULT_NOTE_MARKS)
         marks.update(data.get("note_marks") or {})
@@ -148,7 +165,7 @@ class Theme:
             # will be read, and let the rules carry the complaint. A traceback
             # out of a release is the worst possible way to learn this.
             base = replace(cls.named("slate", root), missing=str(wanted))
-        over = {k: v for k, v in (cfg.get("tokens") or {}).items()
+        over = {k: cls._hex(v) for k, v in (cfg.get("tokens") or {}).items()
                 if k in cls.__dataclass_fields__ and k not in
                 ("note_marks", "note_accent")}
         if cfg.get("note_accent"):

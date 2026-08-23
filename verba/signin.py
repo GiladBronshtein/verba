@@ -184,7 +184,7 @@ def interactive_signin(env, root: Path, log=None, timeout_s: int = 300) -> dict:
     guard = Guard()
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=False, args=["--window-size=1440,900"])
-        ctx = browser.new_context(viewport=VIEWPORT)
+        ctx = browser.new_context(viewport=VIEWPORT, service_workers="block")
         page = ctx.new_page()
         guard.attach(page, log=emit)
         # Anything opened by the sign-in flow is its own Page and inherits no
@@ -233,7 +233,7 @@ def verify(env, root: Path, log=None) -> dict:
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
-        kwargs = {"viewport": VIEWPORT}
+        kwargs = {"viewport": VIEWPORT, "service_workers": "block"}
         if env.auth in ("sso", "handoff"):
             sp = env.session_path(root)
             if not sp.exists():

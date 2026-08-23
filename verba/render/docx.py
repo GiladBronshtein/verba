@@ -277,7 +277,12 @@ class DocxRenderer:
             style_run(para.add_run(tail if pos == 0 else tail.lstrip()), size, color=color)
 
     def note(self, text, label="Note"):
-        icon = self.t.note_icons.get(label, "\U0001F4A1")
+        # note_icons holds the NAME of a drawn mark, not a character. The HTML
+        # and PDF paths draw the SVG; this one concatenated the name into a run,
+        # so every callout in the shipped Word file read "note Note:" and
+        # "warning Important:". Ten of them are in the released v31. Word has no
+        # SVG in a run, so the label carries the callout on its own.
+        icon = ""
         accent = self.t.note_accent.get(label, self.t.brand_blue)
         p = self.doc.add_paragraph()
         set_shd(p, self.t.lavender)
@@ -285,7 +290,8 @@ class DocxRenderer:
         set_indent(p, left_twips=200)
         p.paragraph_format.space_before = Pt(8)
         p.paragraph_format.space_after = Pt(8)
-        style_run(p.add_run(f"{icon} {label}:  "), self.t.size_small + 0.5, True, color=accent)
+        style_run(p.add_run(f"{icon}{label}:  ".lstrip()),
+                  self.t.size_small + 0.5, True, color=accent)
         style_run(p.add_run(text), self.t.size_small + 0.5, color=self.t.navy_deep)
 
     def fields(self, items):

@@ -59,7 +59,16 @@ class Guard:
         return self
 
     # ------------------------------------------------------------------
-    def _post_allowed(self, url: str) -> bool:
+    def _post_allowed(self, method: str, url: str) -> bool:
+        """The named exception, and only for POST.
+
+        This matched on URL alone, with no method check, so an allowlist entry
+        added for a GraphQL read let a DELETE to the same endpoint through for
+        the whole crawl. The setting is called allow_post_matching; it now
+        means what it is called.
+        """
+        if method != "POST":
+            return False
         return any(fnmatch.fnmatch(url, pat) for pat in self.allow_post_matching)
 
     def _handle(self, route, request):
@@ -77,7 +86,7 @@ class Guard:
                 self._log(f"    sign-in request allowed: {entry[:150]}")
             return route.continue_()
 
-        if self._post_allowed(request.url):
+        if self._post_allowed(method, request.url):
             self.allowed_posts.append(f"{method} {request.url} (allowlisted read)")
             return route.continue_()
 
