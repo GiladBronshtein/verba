@@ -13,6 +13,8 @@ from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
+from .attest import is_attested
+
 ERROR, WARN, INFO = "error", "warning", "info"
 
 # Which names must not appear in a neutral edition is a property of the
@@ -203,6 +205,11 @@ REMEDIES = {
                    "The capture came back blank."),
     "FRESH-01":   ("Mark verified", "verify", "Nobody has checked this against "
                                               "the live product."),
+    "FRESH-04":   ("Mark verified", "verify",
+                   "The section says it was verified, but does not say by whom "
+                   "or against which crawl. Accepting it again records both, "
+                   "and the badge is dropped automatically the next time "
+                   "anything but a person changes the section."),
     "FRESH-02":   ("Recapture this screen", "capture", "The check is old."),
     "FRESH-03":   ("Recapture this screen", "capture", "The check is old."),
     "STYLE-01":   ("Rewrite to house style", "assist:polish",
@@ -385,6 +392,17 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
 
         # staleness
         lv = sec.last_verified
+        # A claim without its evidence is not a check, it is a memory of one.
+        # This rule existed to catch an unverified section and stayed quiet on
+        # a document where all thirty-eight said verified, thirty-five of them
+        # stamped on the same day, because a date was present and nothing asked
+        # where the date came from.
+        if sec.status == "verified" and not is_attested(sec.meta):
+            add(Finding("FRESH-04", WARN, sid,
+                        "says verified, but nobody is named and no capture is "
+                        "cited",
+                        "Marking it verified again records who accepted it and "
+                        "which crawl they accepted it against."))
         if not lv:
             add(Finding("FRESH-01", WARN, sid, "no last_verified date"))
         else:

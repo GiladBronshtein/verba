@@ -79,6 +79,8 @@ properly.
 | **One command** | `verba fix`, or `verba fix --full` to photograph everything first. See [The loop](The-loop) |
 | **Twelve steps** | Notes, strays, gaps, writing, drift, pictures, unchecked pictures, evidence review, picture match, the decider, polish |
 | **Measure and revert** | Every step applied, the rules counted again, anything that made it worse put straight back |
+| **Invariants no rule measures** | A step may never lose a figure, lose a table block, cut a section below half its words, or delete a section, whatever the count says |
+| **Tug-of-war detection** | Two steps writing the same file in two rounds running is reported, which a flat error count never could |
 | **No rewrite may drop a figure** | Counting errors is not enough: a rewrite that quietly loses pictures looks like an improvement to a counter |
 | **The decider** | A closed menu: repoint a figure, retire one, stop the crawl making a picture nothing shows, accept, or say plainly that this is yours |
 | **Rules report only actionable work** | A finding no step can clear is not put in front of a person. Unused legacy pictures are inventory, listed under Images |
@@ -135,7 +137,8 @@ properly.
 
 | | |
 |---|---|
-| **33 rules** | Structure, content, style, freshness, assets, profiles, design. See [Rule reference](Rule-reference) |
+| **34 rules** | Structure, content, style, freshness, assets, profiles, design. See [Rule reference](Rule-reference) |
+| **Rules held to a corpus** | Narrowing a rule prints exactly what stops being reported, on every known document, and fails CI until accepted in the same commit |
 | **Three severities** | Errors fail the build; warnings and info do not |
 | **Every rule carries its remedy** | And whether the system or a person clears it. A finding with nothing to press is a complaint |
 | **Reviewable suppressions** | Only in `doc.yaml`, naming the rule and a reason |
@@ -149,6 +152,7 @@ properly.
 | **Light and dark** | Both measured against the surface each colour is actually painted on |
 | **Several documents** | Every system you document, switchable in one console |
 | **History** | Every change ever made, by whom, with a diff and a restore |
+| **Verification that costs something** | Accepting a section records who accepted it and which crawl they read it against, and any machine change drops the badge |
 | **Notes** | `verba note "..."` and the loop does what you asked on its next run |
 | **Locked atomic writes** | Two consoles cannot lose each other's work |
 | **Start without a blank page** | `verba new` asks six questions and writes a project that builds |

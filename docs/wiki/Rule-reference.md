@@ -69,6 +69,7 @@ built in set entirely. See [The writer](The-writer).
 | `FRESH-01` | WARN | Nobody has checked this against the live product. | Mark verified | the system |
 | `FRESH-02` | WARN | The check is old. | Recapture this screen | the system |
 | `FRESH-03` | WARN | The check is old. | Recapture this screen | the system |
+| `FRESH-04` | WARN | The section says it was verified, but does not say by whom or against which crawl. Accepting it again records both, and the badge is dropped automatically the next time anything but a person changes the section. | Mark verified | the system |
 | `GENERIC-01` | ERROR | A customer is named in the tenant-neutral edition. | Edit the section | you |
 | `META-01` | WARN | The status is not one we use. | Edit the section | you |
 | `PROFILE-01` | ERROR | A profile variable did not resolve. | Edit the section | you |
@@ -81,7 +82,17 @@ built in set entirely. See [The writer](The-writer).
 | `STYLE-04` | WARN | An icon is named in prose but not shown. | Rewrite to house style | the system |
 | `STYLE-05` | INFO | Prose that should be bullets. | Rewrite to house style | the system |
 | `STYLE-06` | ERROR | The text names one account's value where it should name the feature. The reader is looking at a different account. | Rewrite to house style | the system |
+
 ## The ones worth understanding
+
+**`FRESH-04`, verified with nothing behind it.** The rule that exists because
+the other freshness rules could not tell an acceptance from a stamp. See
+[Sections](Sections).
+
+**Changing a rule is itself checked.** `tools/rule_baseline.py` holds every
+rule against a corpus of known documents and prints exactly what a change stops
+and starts reporting. CI fails until the new state is accepted in the same
+commit, so narrowing a rule to empty a list is a thing a reviewer sees.
 
 **A rule fires only when something can act on it.** `ASSET-05` reports an
 unreferenced picture only when a screen produces it, because a legacy import no

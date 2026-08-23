@@ -273,7 +273,17 @@ class Auto:
 
     # ------------------------------------------------------------------
     def _step(self, name: str, fn, emit) -> None:
-        """Do one thing, count the rules again, and undo it if it went backwards."""
+        """Do one thing, then check both that it did not break a rule and that
+        it did not do something no rule measures.
+
+        The count alone was the whole basis for leaving a step's work in place,
+        and three separate steps damaged a document without moving it: a
+        rewrite that dropped eleven figures, and two pairs of steps that undid
+        each other forever at a constant count. So the shape of the document is
+        taken as well, and a step that changes it in a way no step is allowed
+        to is put back regardless of what the count says.
+        """
+        from .invariants import Shape, broken
         before = self._errors()
         step = Step(name=name, errors_before=before)
         try:
@@ -281,6 +291,7 @@ class Auto:
             # hand it back: `entries()` keeps the metadata and drops the text,
             # so a revert built on it silently restores nothing.
             snapshot = self._snapshot()
+            shape = Shape.of(self._project())
             step.did = fn(emit) or ""
         except Exception as e:
             step.note = f"could not run: {e}"
@@ -294,21 +305,35 @@ class Auto:
             self.steps.append(step)
             return
 
-        if step.errors_after > step.errors_before:
-            # The whole basis for leaving this alone. A pass that introduces
-            # findings is a pass that made the document worse, whatever it
-            # believed it was doing.
+        damage = broken(shape, Shape.of(self._project()))
+        if damage or step.errors_after > step.errors_before:
+            # A pass that introduces findings is a pass that made the document
+            # worse, whatever it believed it was doing. So is one that took
+            # something out that no rule counts.
             undone = self._restore(snapshot)
             # A decision recorded by a step that was then undone leaves the
             # document without the change and the record saying it was approved,
             # so every later run skips it and it can never be reconsidered.
             self._forget_decisions_since(snapshot)
             step.reverted = True
-            step.note = (f"put back: it added "
-                         f"{step.errors_after - step.errors_before} finding(s)")
-            emit(f"  {name}: {step.did}")
-            emit(f"    reverted {undone} change(s), because the rules got worse "
-                 f"({step.errors_before} to {step.errors_after})")
+            if damage:
+                step.note = "put back: " + damage[0]
+                emit(f"  {name}: {step.did}")
+                emit(f"    reverted {undone} change(s). No rule would have "
+                     f"caught this:")
+                for line in damage[:4]:
+                    emit(f"      {line}")
+                self.for_you.append({
+                    "what": f"a step was put back: {damage[0]}",
+                    "why": f"{name} changed the document in a way nothing "
+                           f"measures, so it was undone rather than trusted.",
+                    "do": "Nothing, unless it keeps happening. Then this is a bug."})
+            else:
+                step.note = (f"put back: it added "
+                             f"{step.errors_after - step.errors_before} finding(s)")
+                emit(f"  {name}: {step.did}")
+                emit(f"    reverted {undone} change(s), because the rules got "
+                     f"worse ({step.errors_before} to {step.errors_after})")
             step.errors_after = self._errors()
         else:
             emit(f"  {name}: {step.did}"

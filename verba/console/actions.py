@@ -174,8 +174,26 @@ def set_meta(section, updates: dict) -> str:
     return f"updated {', '.join(updates)}"
 
 
-def verify(section, when: str | None = None) -> str:
-    section.meta["last_verified"] = when or date.today().isoformat()
-    section.meta["status"] = "verified"
+def verify(section, when: str | None = None, root=None, who: str = "") -> str:
+    """Accept a section, and record what makes that an acceptance.
+
+    A name and the crawl it was read against. Without both it is a date, and a
+    date is what thirty-five sections of the first real document carried while
+    nobody had read any of them.
+    """
+    from ..attest import attest, latest_capture, whoami
+    who = (who or "").strip() or whoami()
+    if not who:
+        raise ValueError(
+            "nobody is named. Set VERBA_WHO, or a name in git config, so the "
+            "acceptance says who made it.")
+    against = latest_capture(root or section.path.parents[2])
+    if not against:
+        raise ValueError(
+            "nothing has been captured yet, so there is nothing to have "
+            "checked this against.")
+    section.meta = attest(section.meta, who, against,
+                          when or date.today().isoformat())
     section.save(section.path)
-    return f"marked verified on {section.meta['last_verified']}"
+    return (f"{who} accepted this on {section.meta['last_verified']}, "
+            f"against capture {against}")

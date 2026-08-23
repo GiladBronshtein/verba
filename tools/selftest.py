@@ -996,6 +996,122 @@ def t_only_actionable_work_is_reported():
             "and the registry keeps its prose")
 
 
+@check("verified means a person checked it, not that somebody typed it")
+def t_verified_costs_something():
+    """The signal the whole system's credibility rests on.
+
+    On the first real document built with this engine, all thirty-eight
+    sections said verified, thirty-five of them stamped with the same date,
+    while History recorded 2.8% of the changes as having a human behind them.
+    The rule meant to catch that stayed quiet because a date was present.
+    """
+    from verba.attest import attest, demote, is_attested
+    from verba.history import History
+    from verba.lint import lint
+    from verba.project import Project
+
+    root = fresh()
+    (root / "capture" / "2026-08-23T000000").mkdir(parents=True, exist_ok=True)
+    (root / "capture" / "2026-08-23T000000" / "inventory.json").write_text("{}")
+
+    proj = Project.load(root)
+    sec = next(iter(proj.sections.values()))
+
+    # a stamp with nothing behind it is reported, where it used to pass
+    sec.meta["status"] = "verified"
+    sec.meta["last_verified"] = "2026-07-01"
+    sec.save(sec.path)
+    fired = [f for f in lint(Project.load(root))
+             if f.rule == "FRESH-04" and sec.id in f.section]
+    ok(fired, "a section claiming verified with nobody named passed the rules")
+
+    # a real acceptance carries who and against what, and clears it
+    sec.meta = attest(sec.meta, "gilad", "2026-08-23T000000", "2026-08-23")
+    sec.save(sec.path)
+    ok(is_attested(sec.meta), "the acceptance did not record its evidence")
+    still = [f for f in lint(Project.load(root))
+             if f.rule == "FRESH-04" and sec.id in f.section]
+    eq(still, [], "an accepted section is still reported: ")
+
+    # and a machine touching it afterwards takes the badge away, at the choke
+    # point every machine write in the engine goes through
+    text = sec.path.read_text(encoding="utf-8")
+    History(root).record(sec.id, sec.path, text, text + "\n\nAdded by a model.\n",
+                         actor="auto", action="edit")
+    after = sec.path.read_text(encoding="utf-8")
+    ok("status: review" in after,
+       "a model rewrote a verified section and it stayed verified")
+    ok("verified_by" not in after,
+       "the acceptance outlived the text it was an acceptance of")
+
+    # a person editing it does not lose their own badge
+    ok(demote("---\nstatus: verified\n---\nx", "human") ==
+       "---\nstatus: verified\n---\nx",
+       "a person's own edit dropped their acceptance")
+    return "a claim carries who and against what, and expires when a machine edits"
+
+
+@check("a step cannot damage what no rule measures")
+def t_invariants_catch_what_counting_missed():
+    """Three separate steps did this in one session, at a flat rule count.
+
+    Each was fixed with a guard against that specific pair of steps. This is
+    the property instead of the patch.
+    """
+    from verba.invariants import Shape, broken, tug_of_war
+
+    was = Shape(sections={"s": {"figures": {"a.png", "b.png", "c.png"},
+                                "blocks": {"fields", "columns"}, "words": 400}})
+
+    keep = Shape(sections={"s": {"figures": {"a.png", "b.png", "c.png"},
+                                 "blocks": {"fields", "columns"}, "words": 380}})
+    eq(broken(was, keep), [], "an ordinary tightening was called damage: ")
+
+    lost = Shape(sections={"s": {"figures": {"a.png"},
+                                 "blocks": {"fields", "columns"}, "words": 400}})
+    ok(any("figure" in x for x in broken(was, lost)),
+       "a rewrite dropping two figures was not caught")
+
+    gutted = Shape(sections={"s": {"figures": {"a.png", "b.png", "c.png"},
+                                   "blocks": {"fields", "columns"}, "words": 90}})
+    ok(broken(was, gutted), "a section cut to a quarter of itself was not caught")
+
+    blocks = Shape(sections={"s": {"figures": {"a.png", "b.png", "c.png"},
+                                   "blocks": {"fields"}, "words": 400}})
+    ok(any("columns" in x for x in broken(was, blocks)),
+       "a lost table block was not caught")
+
+    eq(broken(was, Shape(sections={})),
+       ["1 section(s) stopped existing: s"], "a vanished section was not caught: ")
+
+    # two steps taking turns, at a constant count, over two rounds
+    rounds = [{"writes": {"a.md": ["decide", "look"]}},
+              {"writes": {"a.md": ["look", "decide"]}}]
+    ok(tug_of_war(rounds), "two steps undoing each other went unnoticed")
+    eq(tug_of_war([{"writes": {"a.md": ["decide"]}}] * 2), [],
+       "one step writing one file twice was called a fight: ")
+    return "figures, blocks, word floor, whole sections, and steps taking turns"
+
+
+@check("a rule cannot quietly stop reporting")
+def t_rules_are_held_to_a_corpus():
+    """The move that is always available when a list will not empty.
+
+    Narrow the rule, and the findings go away, and it looks like progress. It
+    is not caught by any test, because every test still passes: the rule just
+    says less. So the corpus is checked in, and a change to what the rules say
+    about it has to be accepted in the same commit a reviewer reads.
+    """
+    import subprocess
+    r = subprocess.run([sys.executable, "tools/rule_baseline.py"],
+                       capture_output=True, text=True,
+                       cwd=str(Path(__file__).resolve().parents[1]))
+    ok(r.returncode == 0,
+       "the rules say something different about the corpus than the baseline "
+       "records:\n" + (r.stdout or r.stderr))
+    return (r.stdout or "").strip().splitlines()[-1][:80]
+
+
 @check("the content model round-trips")
 def t_model():
     from verba.model import Section, parse_section
@@ -1018,6 +1134,9 @@ def main() -> int:
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
              t_only_actionable_work_is_reported,
+             t_rules_are_held_to_a_corpus,
+             t_verified_costs_something,
+             t_invariants_catch_what_counting_missed,
              t_model]
     for t in tests:
         t()

@@ -1,9 +1,16 @@
 # The read only guarantee
 
-Verba never writes to the system it documents. Not "tries not to": the crawl
+Verba does not write to the system it documents. Not "tries not to": the crawl
 runs behind a network guard that aborts every non read request in the browser,
 so a misdirected click on Save cannot write, because the request never leaves
 the browser.
+
+There are exactly two windows where a write is permitted, and both belong to
+you: the sign-in itself, and the seconds while you finish a
+[hand over](Connections-and-sign-in) at the keyboard. Both are recorded request
+by request in the run manifest. This page used to open by calling the guarantee
+an absolute, which was a footnote away from being false, and an absolute with a
+footnote is worth less than a smaller claim you can check.
 
 Everything else in this project depends on that being true, which is why it is
 enforced in three layers and verified by a test.
@@ -115,7 +122,8 @@ It runs on every push.
 
 ## What this means for you
 
-You can point Verba at production. The worst it can do is read. That is the
+You can point Verba at production. Outside the sign-in you asked for, the worst
+it can do is read. That is the
 whole reason a documentation tool is allowed near a live system at all, and it
 is why the guarantee is stated as an absolute rather than a default you can
 switch off: there is no flag that disables it, because a flag that disables it

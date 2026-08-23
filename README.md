@@ -7,9 +7,9 @@
 [![check](https://github.com/GiladBronshtein/verba/actions/workflows/check.yml/badge.svg)](https://github.com/GiladBronshtein/verba/actions/workflows/check.yml)
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-3137DB)](LICENSE)
-[![Writes to your system](https://img.shields.io/badge/writes%20to%20your%20system-never-1F9D55)](#it-can-never-write-to-your-system)
+[![Writes to your system](https://img.shields.io/badge/writes%20to%20your%20system-blocked%20in%20the%20browser-1F9D55)](#what-it-can-never-do-to-your-system)
 
-**[Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#it-can-never-write-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](https://github.com/GiladBronshtein/verba/wiki)**
+**[Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#what-it-can-never-do-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](https://github.com/GiladBronshtein/verba/wiki)**
 
 </div>
 
@@ -108,7 +108,7 @@ pictures.
 
 | | |
 |---|---|
-| **Never writes to your system** | Enforced in the browser. Every non-GET request aborted after sign-in |
+| **Does not write to your system** | Enforced in the browser. Every non-GET aborted, except during the sign-in you asked for, and every one of those recorded |
 | **Masks real names** | Rewrites customer names and identifiers in the DOM immediately before each screenshot |
 | **Stable placeholders** | One real value always becomes the same placeholder, so figures never contradict each other |
 | **Refuses unmasked production** | A connection marked as holding real data cannot be captured unmasked |
@@ -236,9 +236,19 @@ paths on purpose can say so.
 
 ---
 
-## It can never write to your system
+## What it can never do to your system
 
-The guarantee everything else rests on, and it is enforced in code.
+The guarantee everything else rests on, and it is enforced in code rather than
+in a promise.
+
+Every non-GET request is aborted in the browser. There are exactly two windows
+where one is permitted, and both are yours: the sign-in itself, and, with
+`auth: handoff`, the seconds while **you** finish that sign-in at the keyboard.
+Both are recorded request by request in the run manifest, and the second closes
+the instant the product appears rather than when the crawl ends.
+
+That is a smaller claim than "never", and it is one you can check. An absolute
+with a footnote is worth less than a limit that is true.
 
 ```mermaid
 sequenceDiagram

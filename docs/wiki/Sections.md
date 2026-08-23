@@ -34,6 +34,8 @@ Every account in the workspace, with the controls that filter it.
 | `status` | `draft`, `review`, `verified` or `stale` |
 | `screens` | Which registry screens evidence this section. Drives drift |
 | `last_verified` | The date a person last checked this against the product |
+| `verified_by` | Who accepted it. Written by `verba section verify`, never by hand |
+| `verified_against` | The capture they accepted it against |
 | `profiles` | Which editions carry it. See [Editions](Editions) |
 | `icon` | A drawn mark, if the theme has one |
 
@@ -105,6 +107,27 @@ The writer is told to leave `TODO: describe this.` rather than invent a purpose
 the evidence does not support. That marker is refused at build time
 (`CONTENT-02`), so it can never ship. Confident, fluent and wrong is the worst
 failure a documentation tool has, and this is the mechanism that prevents it.
+
+## What verified means
+
+`status: verified` on its own is a string somebody typed. The rules treat it as
+a claim, and `FRESH-04` asks the claim for its evidence: a name, and the crawl
+that person read the section against.
+
+```bash
+verba section verify accounts.list --who "your name"
+```
+
+That writes `verified_by` and `verified_against`. **Any change with a machine
+behind it drops the section back to `review`**, at the one point in the engine
+every machine write passes through, because a person verified the section they
+read and not the one a model rewrote after them.
+
+This is deliberately expensive. On the first real document built with this
+engine, all thirty-eight sections said verified, thirty-five carried the same
+bulk date, and History recorded that 2.8% of the changes to that document had a
+human behind them. The rule that should have caught it stayed quiet because a
+date was present and nothing asked where the date came from.
 
 ## Editing
 

@@ -1077,18 +1077,30 @@ def cmd_section(args):
         return 0
 
     if args.action == "verify":
+        from .attest import attest, latest_capture, whoami
+        who = (getattr(args, "who", "") or "").strip() or whoami()
+        if not who:
+            print("who is accepting this? Nothing here can answer that for you.")
+            print("  python3 -m verba section verify <id> --who \"your name\"")
+            print("  or set VERBA_WHO, or git config user.name")
+            return 1
         stamp = args.date or date.today().isoformat()
+        against = latest_capture(args.root)
+        if not against:
+            print("nothing has been captured yet, so there is nothing to have "
+                  "checked this against. Run a capture first.")
+            return 1
         ids = args.id.split(",") if args.id else [n.id for n in p.nodes]
         n = 0
         for sid in ids:
             sec = p.sections.get(sid)
             if not sec:
                 continue
-            sec.meta["last_verified"] = stamp
-            sec.meta["status"] = "verified"
+            sec.meta = attest(sec.meta, who, against, stamp)
             sec.save(sec.path)
             n += 1
-        print(f"marked {n} section(s) verified on {stamp}")
+        print(f"{who} accepted {n} section(s) on {stamp}, against capture {against}")
+        print("Any change with a machine behind it drops the badge again.")
         return 0
     return 1
 
@@ -1361,6 +1373,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--title")
     s.add_argument("--screen")
     s.add_argument("--date")
+    s.add_argument("--who", help="who is accepting it")
     s.set_defaults(func=cmd_section)
 
     r = sub.add_parser("release")

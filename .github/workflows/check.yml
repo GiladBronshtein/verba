@@ -34,6 +34,9 @@ jobs:
       - name: Lint
         run: ruff check verba tools
 
+      - name: The rules still say the same thing about the corpus
+        run: python tools/rule_baseline.py
+
       - name: Selftest
         run: python tools/selftest.py
 

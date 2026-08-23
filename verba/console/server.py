@@ -1739,7 +1739,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if verb == "verify":
             before = sec.path.read_text(encoding="utf-8")
-            msg = actions.verify(sec, data.get("date"))
+            try:
+                msg = actions.verify(sec, data.get("date"), root=st.root,
+                                     who=data.get("who", ""))
+            except ValueError as e:
+                return self.fail(str(e), 400)
             st.history.record(sid, sec.path, before,
                               sec.path.read_text(encoding="utf-8"),
                               actor="human", action="verify", note=msg)

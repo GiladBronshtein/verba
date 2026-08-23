@@ -72,9 +72,22 @@ class History:
     def record(self, section_id: str, path: Path, before: str | None,
                after: str, actor: str = "human", action: str = "edit",
                note: str = "") -> Revision | None:
-        """Store one change. Returns None when nothing actually differs."""
+        """Store one change. Returns None when nothing actually differs.
+
+        Also the one place a verified section loses its badge. Every machine
+        write in the engine passes through here, so demoting at this choke
+        point cannot be forgotten by a step added later, and a step that wants
+        to skip it has to say so out loud by not recording its change, which
+        is a thing the rest of the loop would notice.
+        """
         if before is not None and before == after:
             return None
+        if path is not None and str(path).endswith(".md"):
+            from .attest import demote
+            demoted = demote(after, actor)
+            if demoted != after:
+                after = demoted
+                path.write_text(after, encoding="utf-8")
         now = datetime.now()
         rev = Revision(
             id=f"{now.strftime('%Y%m%dT%H%M%S')}-{digest(after)}",
