@@ -204,6 +204,19 @@ def _once(items: list) -> list:
     return out
 
 
+def _is_a_persons_signature(finding) -> bool:
+    """A finding only a person can close by being a person.
+
+    Accepting a section is the one thing in this system that means something
+    precisely because a machine cannot do it. Sending these to the decider
+    costs a model call each to be told what the rule already says, and prints
+    "left for a person" once per section per round, which is how a real signal
+    turns back into noise. They belong in front of a person, unasked about.
+    """
+    from .lint import remedy
+    return (remedy(finding.rule) or {}).get("action") == "verify"
+
+
 def _worth_deciding(finding) -> bool:
     """An INFO the system could actually act on, rather than merely mention."""
     if finding.level != "info":
@@ -988,7 +1001,8 @@ class Auto:
         # to the one step whose whole job is settling what nothing else could.
         # They accumulated in front of a person who could only look at them.
         left = [f for f in lint(proj)
-                if f.level in ("error", "warning") or _worth_deciding(f)]
+                if (f.level in ("error", "warning") or _worth_deciding(f))
+                and not _is_a_persons_signature(f)]
         if not left:
             return ""
 

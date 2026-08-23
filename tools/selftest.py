@@ -1048,7 +1048,18 @@ def t_verified_costs_something():
     ok(demote("---\nstatus: verified\n---\nx", "human") ==
        "---\nstatus: verified\n---\nx",
        "a person's own edit dropped their acceptance")
-    return "a claim carries who and against what, and expires when a machine edits"
+    # and the loop must never be able to sign one itself, which is the whole
+    # reason the signature is worth anything
+    from verba.auto import _is_a_persons_signature
+    from verba.lint import WARN, Finding
+    ok(_is_a_persons_signature(Finding("FRESH-04", WARN, "s", "x")),
+       "the decider is allowed to consider marking a section verified")
+    ok(not _is_a_persons_signature(Finding("ASSET-03", WARN, "s", "x")),
+       "an ordinary finding was routed away from the decider")
+    src = (Path(__file__).resolve().parents[1] / "verba" / "auto.py").read_text()
+    ok('"verified"' not in src and "'verified'" not in src,
+       "the loop names the verified status, so it can reach for it")
+    return "a claim carries who and against what, and no machine can sign one"
 
 
 @check("a step cannot damage what no rule measures")
