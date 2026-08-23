@@ -1188,6 +1188,59 @@ def t_model_calls_are_bounded_and_counted():
     return "ceiling enforced, tally kept, three call sites metered, ledger written"
 
 
+@check("a missing theme cannot fail a publish")
+def t_themes_ship_and_never_stop_a_build():
+    """Two faults, one of which would have hit every real install.
+
+    The themes lived beside the package rather than in it, and were not listed
+    as package data, so `pip install verba-docs` shipped none of them and the
+    first build would die on "no such theme: slate". It was invisible because
+    every user so far ran from a checkout, where the directory happens to be
+    where the lookup pointed.
+
+    And a theme that cannot be found ended a publish in a traceback, which is
+    the worst possible way to learn that the colour of your headings is wrong.
+    """
+    import subprocess
+    import tomllib
+
+    from verba.lint import lint
+    from verba.project import Project
+    from verba.theme import BUILTIN, Theme, available
+
+    repo = Path(__file__).resolve().parents[1]
+    pkg = repo / "verba"
+    ok(BUILTIN.is_relative_to(pkg),
+       f"the themes are outside the package, so an install ships none: {BUILTIN}")
+    ok(available(), "no themes at all")
+    data = tomllib.loads((repo / "pyproject.toml").read_text())
+    globs = data["tool"]["setuptools"]["package-data"]["verba"]
+    ok(any("themes" in g for g in globs),
+       f"the themes are not declared as package data: {globs}")
+
+    root = fresh()
+    # a project may carry a palette of its own, and it wins
+    (root / "themes").mkdir(exist_ok=True)
+    (root / "themes" / "house.yaml").write_text(
+        "label: House\nabout: The house palette.\nbrand_blue: '#123456'\n")
+    ok("house" in available(root), "a project's own theme was not offered")
+    eq(Theme.named("house", root).label, "House", "the project theme was not read: ")
+
+    # and one that is not there renders in the default and says so
+    (root / "content" / "theme.yaml").write_text("use: vanished\ntokens: {}\n")
+    picked = Theme.load(root)
+    eq(picked.missing, "vanished", "the substitution was made silently: ")
+    ok(picked.name != "vanished", "a theme that does not exist was returned")
+    flagged = [f for f in lint(Project.load(root)) if f.rule == "DESIGN-04"]
+    ok(flagged, "rendering in the wrong palette was not reported")
+
+    r = subprocess.run([sys.executable, "-m", "verba", "--root", str(root), "build"],
+                       capture_output=True, text=True, cwd=str(repo))
+    eq(r.returncode, 0,
+       "a missing theme still fails a build:\n" + (r.stdout + r.stderr)[-400:])
+    return "themes ship inside the package, a project may add its own, and a missing one falls back"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1229,6 +1282,7 @@ def main() -> int:
              t_apply_and_describe_are_one_step,
              t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
              t_only_actionable_work_is_reported,
+             t_themes_ship_and_never_stop_a_build,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,

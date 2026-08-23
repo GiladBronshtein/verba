@@ -56,7 +56,12 @@ verba = "verba.cli:main"
 packages = ["verba", "verba.console", "verba.render"]
 
 [tool.setuptools.package-data]
-verba = ["console/static/*"]
+# The themes live inside the package because a theme is not documentation, it
+# is something the engine cannot render without. They sat beside the package
+# and were never shipped, so any real install had no themes at all and every
+# build died on "no such theme: slate". Nobody hit it because every user so
+# far ran from a checkout.
+verba = ["console/static/*", "themes/*.yaml"]
 
 [tool.ruff]
 line-length = 100

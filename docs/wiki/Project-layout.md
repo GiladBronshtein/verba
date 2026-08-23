@@ -15,6 +15,7 @@ my-docs/
     environments.yaml     which system to talk to, and how to get in
     routes.yaml           the remembered address of every screen
     theme.yaml            which palette
+    themes/*.yaml         palettes this document carries itself (optional)
     typography.yaml       sheet, margins, and how text is set
     sections/*.md         one file per section
     assets/               pictures, plus registry.json

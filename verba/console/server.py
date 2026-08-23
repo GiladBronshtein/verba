@@ -897,7 +897,7 @@ class Handler(BaseHTTPRequestHandler):
                 cur = Theme.load(st.root)
                 return self.json({
                     "current": cur.name, "label": cur.label,
-                    "themes": table(),
+                    "themes": table(self.root),
                 })
 
             if path == "/api/assistant":
@@ -1289,9 +1289,9 @@ class Handler(BaseHTTPRequestHandler):
                 from ..atomic import write_text as _wt
                 from ..theme import Theme, available
                 key = str((data or {}).get("use") or "").strip()
-                if key not in available():
+                if key not in available(st.root):
                     return self.fail(f"no such theme: {key!r}. "
-                                     f"try one of: {', '.join(available())}")
+                                     f"try one of: {', '.join(available(st.root))}")
                 cfg = st.root / "content" / "theme.yaml"
                 text = cfg.read_text(encoding="utf-8") if cfg.exists() else ""
                 if _re.search(r"^use:.*$", text, _re.M):
@@ -1300,9 +1300,10 @@ class Handler(BaseHTTPRequestHandler):
                     text = f"use: {key}\ntokens: {{}}\n" + text
                 _wt(cfg, text)
                 st.reload()
+                label = Theme.named(key, st.root).label
                 return self.json({"ok": True,
                                   "message": f"the document is now set in "
-                                             f"{Theme.named(key).label}. Rebuild to see it."})
+                                             f"{label}. Rebuild to see it."})
 
             if path == "/api/assistant/set":
                 # Written into content/doc.yaml, not into an environment

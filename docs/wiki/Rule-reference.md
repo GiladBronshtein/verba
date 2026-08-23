@@ -66,10 +66,11 @@ built in set entirely. See [The writer](The-writer).
 | `DESIGN-01` | WARN | The mark has no drawn equivalent, so it prints as an emoji. | Add a drawn mark | you |
 | `DESIGN-02` | WARN | Console text below the type floor. | Edit app.css | you |
 | `DESIGN-03` | WARN | A browser dialog is used. | Replace with modal() | you |
-| `FRESH-01` | WARN | Nobody has checked this against the live product. | Mark verified | the system |
+| `DESIGN-04` | WARN | content/theme.yaml names a palette that is not in this project or in the engine, so the document is rendering in the default. Nothing is broken and nothing was lost: put the file back under themes/, or choose another with verba themes --use. | Pick a theme that exists | you |
+| `FRESH-01` | WARN | Nobody has checked this against the live product. | Mark verified | you |
 | `FRESH-02` | WARN | The check is old. | Recapture this screen | the system |
 | `FRESH-03` | WARN | The check is old. | Recapture this screen | the system |
-| `FRESH-04` | WARN | The section says it was verified, but does not say by whom or against which crawl. Accepting it again records both, and the badge is dropped automatically the next time anything but a person changes the section. | Mark verified | the system |
+| `FRESH-04` | WARN | These sections were marked verified before signatures were recorded, so the badge does not say who checked them or what they checked them against. Nothing automatic can close this, and that is the point of it: run verba accept and the count comes down as you read. Each signature is dropped again the next time anything but a person changes that section. | Read and sign them | you |
 | `GENERIC-01` | ERROR | A customer is named in the tenant-neutral edition. | Edit the section | you |
 | `META-01` | WARN | The status is not one we use. | Edit the section | you |
 | `PROFILE-01` | ERROR | A profile variable did not resolve. | Edit the section | you |

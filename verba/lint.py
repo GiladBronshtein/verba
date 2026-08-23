@@ -230,6 +230,12 @@ REMEDIES = {
                    "feature. The reader is looking at a different account."),
     "GENERIC-01": ("Edit the section", "open",
                    "A customer is named in the tenant-neutral edition."),
+    "DESIGN-04":  ("Pick a theme that exists", "none",
+                   "content/theme.yaml names a palette that is not in this "
+                   "project or in the engine, so the document is rendering in "
+                   "the default. Nothing is broken and nothing was lost: put "
+                   "the file back under themes/, or choose another with "
+                   "verba themes --use."),
     "DESIGN-01":  ("Add a drawn mark", "open",
                    "The mark has no drawn equivalent, so it prints as an emoji."),
     "DESIGN-02":  ("Edit app.css", "none", "Console text below the type floor."),
@@ -432,6 +438,19 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                     "records who made it and the capture they read it against, "
                     "and is dropped automatically the next time anything but a "
                     "person changes that section."))
+
+    # A palette that is not there. Reported rather than raised: a missing
+    # theme used to end a publish in a traceback, which is the worst possible
+    # way to learn that the colour of your headings is wrong.
+    try:
+        from .theme import Theme
+        theme = Theme.load(project.root)
+        if theme.missing:
+            add(Finding("DESIGN-04", WARN, "",
+                        f"no such theme: {theme.missing}",
+                        f"the document is rendering in {theme.name} instead"))
+    except Exception:
+        pass
 
     # -- assets -----------------------------------------------------------
     used: dict[str, list[str]] = {}

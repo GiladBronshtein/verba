@@ -26,6 +26,37 @@ verba themes --check    # measure its contrast
 painted on, not against white. A palette that passes on paper and fails in a
 panel is the normal way this goes wrong.
 
+## A palette of your own
+
+A house palette belongs to the document, not to the engine: it is the one
+design decision that cannot be general, and putting it in the engine means
+every project carries every other project's brand.
+
+```
+my-docs/
+  themes/
+    house.yaml        # or content/themes/house.yaml
+```
+
+```yaml
+label: House
+about: The house palette. Brand blue on near-black text.
+brand_blue: "#3137DB"
+```
+
+```bash
+verba themes --use house
+```
+
+A project theme wins over a built-in of the same name, and `verba themes` lists
+both.
+
+**A theme that cannot be found never fails a build.** The document renders in
+the default and the substitution is reported as `DESIGN-04`, because somebody
+publishing a release is trying to ship a document and the thing that is wrong
+is the colour of its headings. A traceback out of a release is the worst
+possible way to learn that.
+
 ## Typefaces
 
 ```bash

@@ -749,8 +749,9 @@ def cmd_themes(args):
     from .theme import Theme, available, table
 
     if args.use:
-        if args.use not in available():
-            print(f"no such theme: {args.use}. try one of: {', '.join(available())}")
+        if args.use not in available(args.root):
+            print(f"no such theme: {args.use}. "
+                  f"try one of: {', '.join(available(args.root))}")
             return 1
         path = Path(args.root) / "content" / "theme.yaml"
         if path.exists():
@@ -761,7 +762,7 @@ def cmd_themes(args):
             path.parent.mkdir(parents=True, exist_ok=True)
             text = f"use: {args.use}\ntokens: {{}}\n"
         path.write_text(text, encoding="utf-8")
-        print(f"set in {Theme.named(args.use).label}")
+        print(f"set in {Theme.named(args.use, args.root).label}")
         print("rebuild to see it: verba build --pdf")
         return 0
 

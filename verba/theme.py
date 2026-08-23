@@ -22,7 +22,16 @@ from pathlib import Path
 import yaml
 
 CONFIG = "content/theme.yaml"
-BUILTIN = Path(__file__).resolve().parent.parent / "themes"
+# Inside the package. It used to point one level up, at a directory beside the
+# package rather than in it, which worked from a checkout and worked for a
+# vendored copy and shipped nothing at all in a real install.
+BUILTIN = Path(__file__).resolve().parent / "themes"
+
+# Where a project keeps a palette of its own. A house palette belongs to the
+# document, not to the engine: it is the one design decision that cannot be
+# general, and putting it in the engine means every project carries every other
+# project's brand.
+PROJECT_THEMES = ("themes", "content/themes")
 
 # Notes are drawn marks, never emoji: an emoji is a colour bitmap whose design
 # belongs to whoever made the font, it changes between machines, and it sits on
@@ -68,6 +77,11 @@ class Theme:
 
     note_marks: dict = field(default_factory=lambda: dict(DEFAULT_NOTE_MARKS))
     note_accent: dict = field(default_factory=dict)
+    # The name of a theme that was asked for and could not be found. Set when
+    # the default has been substituted, so the substitution can be reported
+    # rather than silently accepted: a document that quietly renders in the
+    # wrong palette is worse than one that says it did.
+    missing: str = ""
 
     # ------------------------------------------------------------------
     def hex(self, token: str) -> str:
@@ -84,12 +98,22 @@ class Theme:
 
     # ------------------------------------------------------------------
     @classmethod
-    def named(cls, name: str) -> "Theme":
-        """One of the themes the engine ships with."""
+    def find(cls, name: str, root: Path | str = ".") -> Path | None:
+        """Where this theme's file is: the project's own first, then the engine's."""
+        for folder in PROJECT_THEMES:
+            path = Path(root) / folder / f"{name}.yaml"
+            if path.exists():
+                return path
         path = BUILTIN / f"{name}.yaml"
-        if not path.exists():
+        return path if path.exists() else None
+
+    @classmethod
+    def named(cls, name: str, root: Path | str = ".") -> "Theme":
+        """A theme by name, from the project or from the engine."""
+        path = cls.find(name, root)
+        if path is None:
             raise ValueError(f"no such theme: {name}. try one of: "
-                             f"{', '.join(available())}")
+                             f"{', '.join(available(root))}")
         return cls._from(yaml.safe_load(path.read_text(encoding="utf-8")) or {}, name)
 
     @classmethod
@@ -112,9 +136,18 @@ class Theme:
         """
         path = Path(root) / CONFIG
         if not path.exists():
-            return cls.named("slate")
+            return cls.named("slate", root)
         cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        base = cls.named(cfg.get("use", "slate"))
+        wanted = cfg.get("use", "slate")
+        try:
+            base = cls.named(wanted, root)
+        except ValueError:
+            # A missing palette is not a reason to fail a publish. Somebody is
+            # trying to ship a document and the thing that is wrong is the
+            # colour of its headings: render it in the default, say so where it
+            # will be read, and let the rules carry the complaint. A traceback
+            # out of a release is the worst possible way to learn this.
+            base = replace(cls.named("slate", root), missing=str(wanted))
         over = {k: v for k, v in (cfg.get("tokens") or {}).items()
                 if k in cls.__dataclass_fields__ and k not in
                 ("note_marks", "note_accent")}
@@ -124,15 +157,19 @@ class Theme:
         return replace(base, **over) if over else base
 
 
-def available() -> list[str]:
-    return sorted(p.stem for p in BUILTIN.glob("*.yaml"))
+def available(root: Path | str = ".") -> list[str]:
+    """Every theme this project can choose, its own included."""
+    names = {p.stem for p in BUILTIN.glob("*.yaml")}
+    for folder in PROJECT_THEMES:
+        names |= {p.stem for p in (Path(root) / folder).glob("*.yaml")}
+    return sorted(names)
 
 
-def table() -> list[dict]:
+def table(root: Path | str = ".") -> list[dict]:
     """Every theme with the two things you choose between: its look and its point."""
     out = []
-    for name in available():
-        t = Theme.named(name)
+    for name in available(root):
+        t = Theme.named(name, root)
         out.append({"name": name, "label": t.label, "about": t.about,
                     "swatch": [t.brand_blue, t.navy_deep, t.lavender,
                                t.periwinkle, t.grey_mid]})

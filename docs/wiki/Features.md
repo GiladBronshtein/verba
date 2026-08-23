@@ -128,6 +128,7 @@ properly.
 | **Variables** | `{{ operator.name }}` rather than naming a company, with unresolved variables failing the build |
 | **Self-extending neutral edition** | The names it must not print are read off your other editions |
 | **Five themes** | Each contrast measured rather than eyeballed. See [Themes and layout](Themes-and-layout) |
+| **A palette of your own** | A project may carry its own themes, and a missing one renders in the default and reports the substitution rather than failing the build |
 | **Four typefaces** | Each with its own body size, line height, tracking, and a DOCX fallback |
 | **Page setup** | Paper, margins, header and footer bands, alignment, hyphenation, figure width, contents depth |
 | **Judged before written** | A layout change is checked against the page you are choosing, all or nothing |
