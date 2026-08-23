@@ -239,7 +239,7 @@ def _is_a_persons_signature(finding) -> bool:
     turns back into noise. They belong in front of a person, unasked about.
     """
     from .lint import remedy
-    return (remedy(finding.rule) or {}).get("action") == "verify"
+    return (remedy(finding.rule) or {}).get("action") in ("verify", "accept")
 
 
 def _worth_deciding(finding) -> bool:

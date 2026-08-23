@@ -205,11 +205,14 @@ REMEDIES = {
                    "The capture came back blank."),
     "FRESH-01":   ("Mark verified", "verify", "Nobody has checked this against "
                                               "the live product."),
-    "FRESH-04":   ("Mark verified", "verify",
-                   "The section says it was verified, but does not say by whom "
-                   "or against which crawl. Accepting it again records both, "
-                   "and the badge is dropped automatically the next time "
-                   "anything but a person changes the section."),
+    "FRESH-04":   ("Read and sign them", "accept",
+                   "These sections were marked verified before signatures were "
+                   "recorded, so the badge does not say who checked them or "
+                   "what they checked them against. Nothing automatic can "
+                   "close this, and that is the point of it: run verba accept "
+                   "and the count comes down as you read. Each signature is "
+                   "dropped again the next time anything but a person changes "
+                   "that section."),
     "FRESH-02":   ("Recapture this screen", "capture", "The check is old."),
     "FRESH-03":   ("Recapture this screen", "capture", "The check is old."),
     "STYLE-01":   ("Rewrite to house style", "assist:polish",

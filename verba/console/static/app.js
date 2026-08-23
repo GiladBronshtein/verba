@@ -195,11 +195,11 @@ function dock({ name, onCancelView }) {
   };
 }
 
-function toast(msg, bad) {
+function toast(msg, bad, ms) {
   document.querySelectorAll('.toast').forEach(t => t.remove());
   const t = el('div', 'toast' + (bad ? ' bad' : ''), esc(msg));
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), bad ? 8000 : 3800);
+  setTimeout(() => t.remove(), ms || (bad ? 8000 : 3800));
 }
 
 async function refresh() {
@@ -1312,6 +1312,16 @@ async function runRemedy(action, f) {
       const r = await api(`/api/section/${encodeURIComponent(f.section)}/verify`,
                           { method: 'POST', json: {} });
       toast(r.message); await refresh(); return drawFindings(holder());
+    }
+    // Signing is reading, so this sends you to the sections rather than
+    // offering a button that would make thirty-eight claims at once. A button
+    // that could clear this in one press is the thing this finding exists to
+    // prevent, so there is not one.
+    if (action === 'accept') {
+      toast('Signing is reading. Open each section, check it against its ' +
+            'screen, and mark it verified there. From a terminal: verba accept',
+            false, 9000);
+      return setView('sections');
     }
   } catch (e) { toast(e.message, true); }
 }
