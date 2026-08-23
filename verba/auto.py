@@ -135,6 +135,31 @@ def _save_reviews(root, data: dict):
 MATCHES = "review/picture-match.json"
 
 
+def _picture_digest(root, name: str) -> str:
+    """A short fingerprint of the picture a verdict was about."""
+    import hashlib
+    for folder in ("content/assets", "content/assets/icons"):
+        path = Path(root) / folder / name
+        if path.exists():
+            return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    return ""
+
+
+def _verdict_still_about(root, name: str, verdict: dict) -> bool:
+    """Is this verdict about the picture that is there now?
+
+    A verdict with no fingerprint is from before they were recorded and is
+    trusted, because throwing away every existing judgement to introduce a
+    field would cost more than it is worth. One that names a different picture
+    is stale: the screen has been photographed since, and nobody has looked at
+    what came back.
+    """
+    was = (verdict or {}).get("of")
+    if not was:
+        return True
+    return was == _picture_digest(root, name)
+
+
 def _load_matches(root) -> dict:
     import json
     try:
@@ -233,8 +258,16 @@ class Auto:
     rounds_run: int = 0
 
     # ------------------------------------------------------------------
-    def run(self, rounds: int = 3, crawl: bool = True, log=None) -> dict:
+    def run(self, rounds: int = 3, crawl: bool = True, log=None,
+            calls: int | None = None) -> dict:
         emit = log or (lambda *_: None)
+        # A ceiling on how often this run may ask a model, and a tally of what
+        # it did ask. Twenty-one call sites, one per section per round on a
+        # large document plus one per picture, and until now the only place
+        # that number appeared was somebody's invoice.
+        from .budget import Budget
+        from .console.assist import metering
+        self.budget = metering(Budget.for_run(calls))
         start = self._errors()
         emit(f"the document breaks {start} rule(s) today"
              if start else "the document breaks no rules today")
@@ -843,6 +876,13 @@ class Auto:
                 verdicts[f"{sec.id}|{name}"] = {
                     "fits": fits, "what": what,
                     "when": datetime.now().strftime("%Y-%m-%d"),
+                    # Which picture was judged. A verdict is about an image,
+                    # not about a filename, and the filename outlives the
+                    # image every time the screen is photographed again. Two
+                    # rules now read these, so a wrong one that never expired
+                    # would quietly silence a rule forever, and nothing would
+                    # ever look at it again.
+                    "of": _picture_digest(self.root, name),
                 }
                 if not fits:
                     emit(f"      {node.number} {sec.title}: the picture shows {what}")
@@ -939,7 +979,9 @@ class Auto:
         except Exception:
             return True
         v = verdicts.get(f"{section_id}|{name}")
-        return True if v is None else bool(v.get("fits", True))
+        if v is None or not _verdict_still_about(self.root, name, v):
+            return True
+        return bool(v.get("fits", True))
 
     def _picture_choices(self, proj) -> list[dict]:
         """Pictures already photographed, and what each screen is called.
@@ -1487,12 +1529,23 @@ class Auto:
             "steps": [s.to_dict() for s in self.steps],
             "for_you": _once(self.for_you),
         }
+        budget = getattr(self, "budget", None)
+        if budget is not None:
+            out["model"] = {"calls": budget.calls, "limit": budget.limit,
+                            "tokens": budget.tokens(),
+                            "by_task": dict(sorted(budget.by_task.items()))}
+            budget.record(self.root)
         path = self.root / "review" / "auto.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(out, indent=2, ensure_ascii=False),
                         encoding="utf-8")
 
         emit("")
+        if budget is not None and budget.calls:
+            emit(budget.summary())
+            if budget.calls >= budget.limit:
+                emit("  that is the ceiling. Raise it with VERBA_MODEL_CALLS if "
+                     "the document is genuinely this big.")
         did = [s for s in self.steps if s.did and not s.reverted]
         if did:
             emit(f"{len(did)} thing(s) done over {self.rounds_run} round(s)")

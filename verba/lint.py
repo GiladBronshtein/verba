@@ -541,6 +541,13 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         if verdict.get("fits", True):
             continue
         sid, _, fname = key.partition("|")
+        # A verdict is about an image, not about a filename, and the filename
+        # outlives the image every time a screen is photographed again. Two
+        # rules read these, so one that never expired would silence a rule on
+        # evidence about a picture that is no longer there.
+        from .auto import _verdict_still_about
+        if not _verdict_still_about(project.root, fname, verdict):
+            continue
         misfits.setdefault(sid, set()).add(fname)
         sec = project.sections.get(sid)
         if sec is None or fname not in (sec.screenshots() or []):

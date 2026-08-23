@@ -18,7 +18,8 @@ verba capture --wait-for-signin   wait while you sign in, second factor and all
     verba edition                which sections this edition carries
     verba survey                 what the document is missing, before you crawl
     verba tidy                   fix the writing across the document, as one decision
-    verba note "..."             write down something you noticed
+    verba accept                 read the unsigned sections and sign them, one at a time
+verba note "..."             write down something you noticed
     verba auto                   run the whole loop and only stop where you are needed
     verba env list|use|verify|signin|password   connection profiles
     verba capture --heal         let the model repair selectors that break
@@ -1105,6 +1106,98 @@ def cmd_section(args):
     return 1
 
 
+def cmd_accept(args):
+    """Walk the sections nobody has signed, one at a time."""
+    from .accept import outstanding, sign
+    from .attest import latest_capture, whoami
+    from .history import History
+
+    root = Path(args.root)
+    p = _project(args)
+    who = (args.who or "").strip() or whoami()
+    if not who:
+        print("Who is accepting these? Nothing here can answer that for you.")
+        print('  python3 -m verba accept --who "your name"')
+        return 1
+    against = latest_capture(root)
+    if not against:
+        print("Nothing has been captured yet, so there is nothing to check "
+              "these against. Run a capture first.")
+        return 1
+
+    cards = outstanding(p, root)
+    if args.id:
+        wanted = set(args.id.split(","))
+        cards = [c for c in cards if c.id in wanted]
+    if not cards:
+        print("Every section carries a signature. Nothing to accept.")
+        return 0
+
+    print(f"{len(cards)} section(s) nobody has signed.")
+    print(f"Signing as {who}, against capture {against}.\n")
+    print("  y = yes, I have read this and it is right")
+    print("  n = no, leave it unsigned and tell me why")
+    print("  o = show me the whole section")
+    print("  q = stop here\n")
+
+    signed = skipped = 0
+    for i, card in enumerate(cards, 1):
+        print("=" * 72)
+        print(f"[{i}/{len(cards)}]  {card.number}  {card.title}")
+        print(f"       {card.id}  ({card.words} words, "
+              f"{len(card.figures)} figure(s), status {card.status})")
+        if card.last:
+            print(f"       last stamped {card.last}, by nobody")
+        diffs = card.differences()
+        if diffs:
+            print("\n  The crawl and the text do not agree:")
+            for d in diffs:
+                print(f"    {d}")
+        else:
+            print("\n  The crawl found nothing the text does not already say.")
+        if card.figures:
+            print(f"\n  Figures: {', '.join(card.figures)}")
+
+        while True:
+            answer = input("\n  read it and accept? [y/n/o/q] ").strip().lower()
+            if answer == "o":
+                sec = p.sections.get(card.id)
+                print("\n" + "-" * 72)
+                print(sec.path.read_text(encoding="utf-8"))
+                print("-" * 72)
+                continue
+            break
+
+        if answer == "q":
+            print("\nstopped.")
+            break
+        if answer != "y":
+            # An empty answer is a skip, never a yes. Holding down Return is
+            # exactly the behaviour this whole mechanism exists to prevent.
+            skipped += 1
+            why = input("  why not? (optional) ").strip()
+            if why:
+                from .notes import Notes
+                Notes.load(root).add(why, section=card.id)
+                print("  noted, the loop will pick it up")
+            continue
+
+        sec = p.sections.get(card.id)
+        before = sec.path.read_text(encoding="utf-8")
+        msg = sign(p, root, card.id, who=who, when=args.date or "")
+        History(root).record(card.id, sec.path, before,
+                             sec.path.read_text(encoding="utf-8"),
+                             actor="human", action="accept", note=msg)
+        signed += 1
+        print(f"  {msg}")
+
+    print(f"\n{signed} accepted, {skipped} left unsigned, "
+          f"{len(cards) - signed - skipped} not reached.")
+    if signed:
+        print("Any change with a machine behind it drops those badges again.")
+    return 0
+
+
 def cmd_release(args):
     p = _project(args)
     findings = lint(p)
@@ -1374,6 +1467,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--screen")
     s.add_argument("--date")
     s.add_argument("--who", help="who is accepting it")
+
+    ac = sub.add_parser("accept")
+    ac.add_argument("--id", help="comma separated section ids")
+    ac.add_argument("--who", help="who is accepting them")
+    ac.add_argument("--date")
+    ac.set_defaults(func=cmd_accept)
     s.set_defaults(func=cmd_section)
 
     r = sub.add_parser("release")

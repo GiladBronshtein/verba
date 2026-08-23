@@ -97,6 +97,13 @@ what you asked for.
 
 ## Writing
 
+### `verba accept [--id IDS] [--who NAME] [--date D]`
+Walk the sections nobody has signed. For each one it shows what the section
+claims, what the crawl saw on the screen behind it, and where the two disagree,
+then asks. `y` accepts, `n` leaves it and offers to take a note, `o` prints the
+whole section, `q` stops. **An empty answer is a skip, never a yes**, because
+holding down Return is the behaviour the signature exists to prevent.
+
 ### `verba section new|show|set|verify [id] [values...]`
 
 ```bash

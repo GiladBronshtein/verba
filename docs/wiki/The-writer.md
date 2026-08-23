@@ -122,6 +122,21 @@ recorded in History with its reasoning.
   not support, and that marker fails the build so it can never ship.
 - **The decider has three moves and no fourth.**
 
+## What it costs
+
+Every run has a ceiling on how many times it may ask a model, and keeps a tally
+by task:
+
+```
+34 model call(s) of 400 allowed, about 71,200 tokens, 21 picture(s)
+(look at a picture 21, decide 8, read against evidence 5)
+```
+
+Written to `review/model-usage.json` every run, so cost has a history rather
+than arriving as a surprise from a different system. Raise the ceiling with
+`VERBA_MODEL_CALLS` when a document is genuinely large. Its job is not to save
+money on a normal run: it is to make a loop stuck in a circle stop and say so.
+
 ## What is sent
 
 Only what the task needs: the section text, the crawl evidence for it, and for

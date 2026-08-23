@@ -115,6 +115,8 @@ pictures.
 | **Closes the one open window** | While you finish a sign-in yourself, writes are permitted. That ends the instant the product appears, not at the end of the crawl |
 | **Locked, atomic writes** | Two consoles cannot lose each other's work |
 | **Everything reversible** | Every change is in History, by whom, with a diff and a restore |
+| **Verified means a person** | An acceptance names who made it and the crawl they read it against, and no automated step can produce one |
+| **A ceiling on model calls** | Every run is capped and counted, so a loop stuck in a circle stops rather than billing until somebody notices |
 
 ### The document
 
@@ -433,6 +435,7 @@ To watch drift appear, change Meridian: rename a column in
 | `verba fix` | settle everything the system can, and say what is left |
 | `verba fix --full` | photograph every screen first, then do that |
 | `verba auto` | the whole loop, stopping only where you are needed |
+| `verba accept` | walk the unsigned sections and sign them, one at a time |
 | `verba lint` | run the content rules |
 | `verba build --pdf` | render DOCX, PDF and the HTML preview |
 | `verba release --version v2` | cut a version, never overwriting an output |

@@ -153,6 +153,9 @@ properly.
 | **Several documents** | Every system you document, switchable in one console |
 | **History** | Every change ever made, by whom, with a diff and a restore |
 | **Verification that costs something** | Accepting a section records who accepted it and which crawl they read it against, and any machine change drops the badge |
+| **An acceptance walk** | `verba accept` shows each unsigned section against its crawl evidence and what the two disagree about, one at a time. An empty answer is a skip, never a yes |
+| **A ceiling on model calls** | Every run has a call limit and keeps a tally by task, written to a ledger, so a loop stuck in a circle stops rather than continuing until an invoice arrives |
+| **Verdicts expire with their picture** | A picture judgement is fingerprinted against the image it judged, so a screen photographed again is looked at again rather than silenced by a stale ruling |
 | **Notes** | `verba note "..."` and the loop does what you asked on its next run |
 | **Locked atomic writes** | Two consoles cannot lose each other's work |
 | **Start without a blank page** | `verba new` asks six questions and writes a project that builds |

@@ -396,14 +396,38 @@ def house_rules_are_custom(root: Path | str = ".") -> bool:
     return p.exists() and bool(p.read_text(encoding="utf-8").strip())
 
 
+# The meter. Set for the length of a run by whoever starts one; None means
+# nobody is counting, which is the right default for a single command a person
+# typed and the wrong one for a loop.
+_BUDGET = None
+
+
+def metering(budget):
+    """Count every model call for the length of a run."""
+    global _BUDGET
+    _BUDGET = budget
+    return budget
+
+
+def meter():
+    return _BUDGET
+
+
 def run_model(prompt: str, system: str | None = None,
               timeout: int = DEFAULT_TIMEOUT, log=None,
               backend: str | None = None,
-              root: Path | str = ".") -> AssistResult:
+              root: Path | str = ".", task: str = "ask",
+              images: int = 0) -> AssistResult:
     # None, not HOUSE_RULES, because the default has to be read from the
     # project at call time: a module-level default would bake in whichever
     # product happened to be loaded when this module was imported.
     system = house_rules(root) if system is None else system
+    if _BUDGET is not None:
+        from ..budget import OverBudget
+        try:
+            _BUDGET.check(task)
+        except OverBudget as e:
+            return AssistResult(False, error=str(e), task=task)
     ready = [b for b in backends() if b["ready"]]
     if not ready:
         return AssistResult(False, error=available()[1])
@@ -411,18 +435,23 @@ def run_model(prompt: str, system: str | None = None,
     if log:
         label = next((b["label"] for b in ready if b["id"] == chosen), chosen)
         log(f"asking {label}, up to {timeout}s ...")
+    def spent(res):
+        if _BUDGET is not None:
+            _BUDGET.spend(task, prompt, res.output or "", images)
+        return res
+
     try:
         if chosen == "litellm":
-            return _run_litellm(prompt, system, timeout)
+            return spent(_run_litellm(prompt, system, timeout))
         if chosen == "api":
-            return _run_api(prompt, system, timeout)
+            return spent(_run_api(prompt, system, timeout))
         if inside_claude_code():
             return AssistResult(
                 False, backend="cli",
                 error="the Claude Code CLI cannot be called from inside a Claude "
                       "Code session. Start the console from an ordinary terminal, "
                       "or configure a gateway under assist: in content/doc.yaml.")
-        return _run_cli(prompt, system, timeout)
+        return spent(_run_cli(prompt, system, timeout))
     except subprocess.TimeoutExpired:
         return AssistResult(False, backend=chosen, error=(
             f"no answer within {timeout}s. If the console was started from inside "
@@ -607,11 +636,20 @@ def look(image: Path | str, product: str = "", vendor: str = "",
         client = anthropic.Anthropic(api_key=key, timeout=timeout)
         backend = "api"
 
+    if _BUDGET is not None:
+        from ..budget import OverBudget
+        try:
+            _BUDGET.check("look at a picture")
+        except OverBudget as e:
+            return AssistResult(False, error=str(e), backend=backend)
     try:
         msg = client.messages.create(
             model=DEFAULT_MODEL, max_tokens=400, system=LOOK_SYSTEM,
             messages=[{"role": "user", "content": content}])
-        return AssistResult(True, output=_text_of(msg).strip(), backend=backend)
+        out = _text_of(msg).strip()
+        if _BUDGET is not None:
+            _BUDGET.spend("look at a picture", LOOK_SYSTEM, out, images=1)
+        return AssistResult(True, output=out, backend=backend)
     except Exception as e:
         return AssistResult(False, error=str(e)[:300], backend=backend)
 
@@ -774,6 +812,12 @@ def matches_section(image: Path | str, number: str, title: str, text: str,
         backend = "api"
 
     try:
+        if _BUDGET is not None:
+            from ..budget import OverBudget
+            try:
+                _BUDGET.check("does the picture match")
+            except OverBudget as e:
+                return AssistResult(False, error=str(e), backend=backend)
         msg = client.messages.create(
             model=DEFAULT_MODEL, max_tokens=300, system=MATCH_SYSTEM,
             messages=[{"role": "user", "content": [
@@ -782,7 +826,10 @@ def matches_section(image: Path | str, number: str, title: str, text: str,
                     "type": "base64", "media_type": kind,
                     "data": base64.standard_b64encode(path.read_bytes()).decode()}},
             ]}])
-        return AssistResult(True, output=_text_of(msg).strip(), backend=backend)
+        out = _text_of(msg).strip()
+        if _BUDGET is not None:
+            _BUDGET.spend("does the picture match", brief, out, images=1)
+        return AssistResult(True, output=out, backend=backend)
     except Exception as e:
         return AssistResult(False, error=str(e)[:300], backend=backend)
 

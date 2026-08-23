@@ -115,8 +115,12 @@ a claim, and `FRESH-04` asks the claim for its evidence: a name, and the crawl
 that person read the section against.
 
 ```bash
-verba section verify accounts.list --who "your name"
+verba accept                                        # walk everything unsigned
+verba section verify accounts.list --who "your name"   # or one at a time
 ```
+
+`verba accept` puts each section in front of you with what the crawl saw behind
+it and where the two disagree, so signing is reading rather than typing.
 
 That writes `verified_by` and `verified_against`. **Any change with a machine
 behind it drops the section back to `review`**, at the one point in the engine

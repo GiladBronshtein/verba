@@ -11,6 +11,7 @@ that it works on a product it has never seen.
 from __future__ import annotations
 
 import base64
+import json
 import shutil
 import sys
 import tempfile
@@ -992,8 +993,24 @@ def t_only_actionable_work_is_reported():
     eq(len(after["screens"]), len(data["screens"]), "screens were lost: ")
     ok("icon-nothing-shows.png" not in now, "the crop is still in the registry")
 
+    # 5. A verdict is about an image, not a filename. Two rules read these
+    #    now, so one that never expired would silence a rule on evidence about
+    #    a picture that has since been replaced.
+    from verba.auto import _picture_digest, _verdict_still_about
+    shot_path = assets / other
+    digest = _picture_digest(root, other)
+    ok(digest, "a picture on disk has no fingerprint")
+    fresh_verdict = {"fits": False, "of": digest}
+    ok(_verdict_still_about(root, other, fresh_verdict),
+       "a verdict about the picture that is there was called stale")
+    shot_path.write_bytes(PNG + b"\n")          # the screen was photographed again
+    ok(not _verdict_still_about(root, other, fresh_verdict),
+       "a verdict about a replaced picture is still believed")
+    ok(_verdict_still_about(root, other, {"fits": False}),
+       "a verdict from before fingerprints were kept was thrown away")
+
     return ("unreachable work is not reported, the two rules no longer fight, "
-            "and the registry keeps its prose")
+            "the registry keeps its prose, and a verdict expires with its picture")
 
 
 @check("verified means a person checked it, not that somebody typed it")
@@ -1104,6 +1121,46 @@ def t_invariants_catch_what_counting_missed():
     return "figures, blocks, word floor, whole sections, and steps taking turns"
 
 
+@check("a runaway loop stops instead of billing all night")
+def t_model_calls_are_bounded_and_counted():
+    """Twenty-one call sites, and until now no idea how many were made.
+
+    The ceiling is not there to save money on a normal run. It is there so a
+    loop stuck in a circle stops and says so, rather than continuing quietly
+    until somebody finds out from an invoice.
+    """
+    from verba.budget import Budget, OverBudget
+
+    b = Budget.for_run(3)
+    for _ in range(3):
+        b.check("decide")
+        b.spend("decide", "x" * 4000, "y" * 800)
+    ok("3 model call(s) of 3" in b.summary(), f"the tally is wrong: {b.summary()}")
+    ok(b.tokens() > 0, "nothing was counted")
+    try:
+        b.check("decide")
+        raise AssertionError("the ceiling did not stop the run")
+    except OverBudget:
+        pass
+
+    # a picture costs more than a sentence, and is counted as such
+    v = Budget.for_run(10)
+    v.spend("look at a picture", "brief", "CLEAN", images=1)
+    ok(v.tokens() > 1000, "a picture was counted as if it were a few words")
+
+    # and the meter is at the door every call goes through
+    src = (Path(__file__).resolve().parents[1] / "verba" / "console"
+           / "assist.py").read_text()
+    eq(src.count("_BUDGET.spend"), 3,
+       "a model call site is not metered (run_model, look, match): ")
+
+    root = fresh()
+    b.record(root)
+    ledger = json.loads((root / "review" / "model-usage.json").read_text())
+    ok(ledger["runs"], "the run was not written to the ledger")
+    return "ceiling enforced, tally kept, three call sites metered, ledger written"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1146,6 +1203,7 @@ def main() -> int:
              t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
              t_only_actionable_work_is_reported,
              t_rules_are_held_to_a_corpus,
+             t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,
              t_invariants_catch_what_counting_missed,
              t_model]
