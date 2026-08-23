@@ -1241,6 +1241,76 @@ def t_themes_ship_and_never_stop_a_build():
     return "themes ship inside the package, a project may add its own, and a missing one falls back"
 
 
+@check("the cover places its parts and nothing is said twice")
+def t_cover_and_duplicate_content():
+    """Two faults a reader sees before anything else.
+
+    The cover ran the vendor at 64pt and the product under it at 32pt, so a
+    document whose vendor and product share a word printed RISE and then Rise
+    Hub: three competing titles and the same word twice, under a third of a
+    page of nothing. And inside, one section explained Supply and Demand in a
+    terms table and again in a tabs table, in identical words, which no rule
+    noticed because the two blocks are different kinds.
+    """
+    from verba.lint import lint
+    from verba.project import Project
+    from verba.render.pdf import PdfRenderer, _revision_label
+
+    eq(_revision_label("draft 2026-08-23"), "Draft",
+       "the cover prints the date twice, once labelled Revision: ")
+    eq(_revision_label("v33"), "v33", "a real version was rewritten: ")
+
+    root = fresh()
+    proj = Project.load(root)
+    html = PdfRenderer(proj)._cover()
+    ok('class="band"' in html and 'class="low"' in html,
+       "the cover is not built in two parts")
+    ok("64pt" not in html, "the old masthead is still in the cover")
+    # vendor and product are the same word in the fixture's neighbourhood: the
+    # eyebrow must not simply repeat the title
+    name = proj.config["product"]["name"]
+    ok(html.count(name) <= 2, f"the product name is printed too often: {html.count(name)}")
+
+    sec = next(iter(proj.sections.values()))
+    body = sec.path.read_text(encoding="utf-8")
+    sec.path.write_text(body + """
+
+```terms
+- term: Region
+  definition: Where events for this account are delivered.
+```
+
+```fields
+- field: Region
+  description: Where events for this account are delivered.
+```
+""", encoding="utf-8")
+    said = [f for f in lint(Project.load(root)) if f.rule == "CONTENT-04"]
+    ok(said, "the same control explained twice in one section was not reported")
+    ok("region" in said[0].message.lower(), f"the wrong label was named: {said[0].message}")
+
+    # and a shared label with different wording is left alone: a field called
+    # Status and an action called Status are two different things
+    sec2 = list(Project.load(root).sections.values())[1]
+    b2 = sec2.path.read_text(encoding="utf-8")
+    sec2.path.write_text(b2 + """
+
+```fields
+- field: Status
+  description: Whether the account is live.
+```
+
+```actions
+- action: Status
+  description: Opens the health panel for this account.
+```
+""", encoding="utf-8")
+    named = [f for f in lint(Project.load(root))
+             if f.rule == "CONTENT-04" and "status" in f.message.lower()]
+    eq(named, [], "two different things sharing a name were called a duplicate: ")
+    return "cover is a band and a sheet, and one control cannot be explained twice"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1283,6 +1353,7 @@ def main() -> int:
              t_readonly, t_readonly_live, t_handoff_waits_for_the_person,
              t_only_actionable_work_is_reported,
              t_themes_ship_and_never_stop_a_build,
+             t_cover_and_duplicate_content,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,

@@ -14,6 +14,17 @@ from ..typography import Typography
 from .html import HtmlRenderer, _esc
 
 
+def _revision_label(stamp: str) -> str:
+    """What goes under Revision on the cover.
+
+    "draft 2026-08-23" sat directly above a Date row carrying the same day: the
+    date printed twice, and neither of them reading as a revision. The running
+    footer keeps the long form, where telling two proofs apart is the point.
+    """
+    s = str(stamp or "").strip()
+    return "Draft" if s.lower().startswith("draft") else s
+
+
 def _mm(value) -> str:
     return f"{float(value):g}"
 
@@ -79,20 +90,49 @@ code,kbd,.mono{font-family:$MONO;font-size:0.94em;letter-spacing:0}
 main{max-width:none}
 nav,.meta,.driftbox{display:none !important}
 
-.cover{height:257mm;position:relative;page-break-after:always;padding:0}
-.cover .bar{position:absolute;left:0;right:0;height:8mm;background:var(--blue)}
-.cover .bar.top{top:-6mm} .cover .bar.bottom{bottom:-6mm}
-.cover .vendor{font-size:64pt;font-weight:700;color:var(--navy);margin:70mm 0 0;letter-spacing:-1pt}
-.cover hr{border:0;height:1.2mm;background:var(--blue);margin:6mm 0 5mm}
-.cover .product{font-size:32pt;color:var(--navy);margin:0}
-.cover .subtitle{font-size:14pt;color:var(--blue);margin:4mm 0 0}
-.cover .facts{margin-top:18mm;background:var(--lav);border-left:1.5mm solid var(--blue);
-  border-radius:0 2mm 2mm 0;padding:7mm 9mm}
-.cover .facts div{margin:2.5mm 0;font-size:11pt}
-.cover .facts b{color:var(--navy);display:inline-block;min-width:34mm}
-.cover .facts span{color:#646470}
-.cover .conf{position:absolute;bottom:14mm;left:0;right:0;text-align:center;
-  color:var(--grey-mid);font-size:9.5pt}
+/* The cover.
+
+   It used to run the vendor name at 64pt, the product under it at 32pt and the
+   subtitle under that, which on a document whose vendor and product share a
+   word printed RISE and then Rise Hub: three competing titles and the same word
+   twice. Above them sat a third of a page of nothing, because the block was
+   pushed down by a fixed 70mm margin rather than placed.
+
+   Now the page has two parts. A field carries the identity, and the sheet below
+   it carries the facts. Nothing floats, and the title is the only large thing
+   on the page. */
+.cover{height:257mm;page-break-after:always;padding:0;
+  display:flex;flex-direction:column}
+.cover .band{height:132mm;background:var(--hero);padding:26mm $SIDEmm 20mm;
+  position:relative;display:flex;flex-direction:column;justify-content:space-between}
+.cover .band:after{content:"";position:absolute;left:0;right:0;bottom:0;
+  height:2.2mm;background:var(--blue)}
+.cover .vendor{font-size:9pt;letter-spacing:0.26em;text-transform:uppercase;
+  color:var(--peri);font-weight:600}
+.cover .titles{margin-bottom:2mm}
+.cover .product{font-size:42pt;line-height:1.02;letter-spacing:-0.028em;
+  font-weight:700;color:#fff;max-width:150mm;margin:0}
+.cover .subtitle{color:var(--peri);font-size:13pt;margin:7mm 0 0;font-weight:400}
+.cover .low{flex:1;padding:22mm $SIDEmm 20mm;display:flex;flex-direction:column}
+.cover .lead{font-size:10.5pt;line-height:1.62;color:var(--grey);max-width:132mm;
+  margin-bottom:14mm}
+/* Two columns, because five or six facts in one column leaves a page half
+   empty and reads as a form rather than a colophon. */
+/* Under the band, not pinned to the foot. Pinned, the facts left ninety
+   millimetres of white between themselves and the thing they belong to, which
+   is the dead space this cover was redrawn to remove, moved down the page. */
+.cover .facts{font-size:9.5pt;
+  display:grid;grid-template-columns:1fr 1fr;column-gap:16mm}
+.cover .facts div{display:flex;gap:6mm;padding:2.7mm 0;
+  border-bottom:0.2mm solid rgba(0,0,0,0.14)}
+.cover .facts div:nth-child(1),.cover .facts div:nth-child(2){
+  border-top:0.2mm solid rgba(0,0,0,0.14)}
+.cover .facts b{font-weight:600;font-size:7.6pt;letter-spacing:0.1em;
+  text-transform:uppercase;color:var(--grey-mid);width:26mm;flex:none;
+  padding-top:0.4mm}
+.cover .facts span{color:var(--navy);font-weight:500}
+.cover .conf{margin-top:auto;display:flex;justify-content:space-between;
+  color:var(--grey-mid);font-size:8pt;letter-spacing:0.04em}
 
 .toc{page-break-after:always}
 .toc h1{margin-top:0;margin-bottom:4mm}
@@ -111,8 +151,16 @@ h1,h2,h3,h4{letter-spacing:-0.012em;text-wrap:balance;font-weight:700}
 h1{font-size:2.1em;color:var(--navy);margin:0 0 5mm;padding-bottom:3mm;
   border-bottom:1mm solid var(--blue);page-break-before:always;page-break-after:avoid}
 h1.first{page-break-before:avoid}
-h2{font-size:1.27em;color:var(--blue);margin:8mm 0 2mm;page-break-after:avoid}
-h3{font-size:1.1em;color:var(--navy);margin:6mm 0 2mm;page-break-after:avoid}
+/* Colour was carrying the hierarchy and could not: h2 at 1.27em and h3 at 1.1em
+   are the same size to a reader, so the only thing separating a chapter from a
+   sub-heading was blue against navy, and blue text at that weight reads as a
+   link rather than as a heading. Size and weight separate them now, and the
+   rule above an h2 does the work of the whitespace that used to be there. */
+h2{font-size:1.62em;color:var(--hero);margin:11mm 0 3mm;padding-top:3.5mm;
+  border-top:0.35mm solid rgba(0,0,0,0.16);letter-spacing:-0.02em;
+  page-break-after:avoid}
+h3{font-size:1.16em;color:var(--blue);font-weight:600;margin:7mm 0 1.6mm;
+  page-break-after:avoid}
 h4{font-size:0.97em;color:var(--blue);margin:4mm 0 1.5mm;page-break-after:avoid;
   letter-spacing:0.02em;text-transform:none}
 /* A heading must never be the last thing on a page. */
@@ -234,8 +282,9 @@ class PdfRenderer:
             ("Environment", doc.get("environment", "")),   # dropped below if empty
             ("Platform", prod.get("platform_version", "")),
             ("Edition", self.p.profile.name.title()),
-            ("Revision", cfg.get("_release_label", "draft")),
+            ("Revision", _revision_label(cfg.get("_release_label", "draft"))),
             ("Date", date.today().strftime("%d %B %Y")),
+            ("Sections", str(sum(1 for n in self.p.nodes if n.section))),
         ]
         # A label with nothing beside it reads as a field that failed to fill,
         # not as a fact that does not apply, so an empty row is not printed.
@@ -244,16 +293,28 @@ class PdfRenderer:
         # A company that has not named itself separately from its product is not
         # two lines of cover: printing the same word large and then again small
         # reads as a template that failed to fill rather than as a masthead.
+        # The vendor is an eyebrow now, not a masthead, so the guard against
+        # printing the same word twice only has to catch the case where one
+        # contains the other: "Rise" over "Rise Hub" is a company above its
+        # product and reads correctly, where "RISE" at 64pt over "Rise Hub" at
+        # 32pt read as a template that had failed to fill.
         name, vendor = prod.get("name", ""), prod.get("vendor") or ""
-        masthead = vendor or name
-        second = name if vendor and vendor.strip() != name.strip() else ""
-        return (f'<div class="cover"><div class="bar top"></div>'
-                f'<div class="vendor">{_esc(masthead).upper()}</div><hr>'
-                f'<div class="product">{_esc(second)}</div>'
+        eyebrow = vendor.strip() if vendor.strip() and vendor.strip() != name.strip() else ""
+        lead = _esc(doc.get("lead", "")) if doc.get("lead") else ""
+        conf = _esc(doc.get("confidentiality", ""))
+        return (f'<div class="cover">'
+                f'<div class="band">'
+                f'<div class="vendor">{_esc(eyebrow)}</div>'
+                f'<div class="titles">'
+                f'<div class="product">{_esc(name)}</div>'
                 f'<div class="subtitle">{_esc(self.p.title())}</div>'
+                f'</div></div>'
+                f'<div class="low">'
+                f'{f"<div class=lead>{lead}</div>" if lead else ""}'
                 f'<div class="facts">{facts}</div>'
-                f'<div class="conf">{_esc(doc.get("confidentiality",""))}</div>'
-                f'<div class="bar bottom"></div></div>')
+                f'<div class="conf"><span>{conf}</span>'
+                f'<span>{_esc(eyebrow or name)}</span></div>'
+                f'</div></div>')
 
     def _toc(self) -> str:
         depth = self.p.config.get("build", {}).get("toc_depth", 3)
@@ -291,9 +352,9 @@ class PdfRenderer:
                 # front matter prints at zero page margin so the cover bleeds
                 # to the paper edge; padding moves inside the elements
                 f'@page{{margin:0}}'
-                f'.cover{{height:297mm;padding:20mm 18mm;page-break-after:always}}'
-                f'.cover .bar.top{{top:0}}.cover .bar.bottom{{bottom:0}}'
-                f'.cover .vendor{{margin-top:62mm}}'
+                # Full sheet, and the band bleeds to the paper edge because
+                # the front matter prints at zero page margin.
+                f'.cover{{height:297mm;padding:0;page-break-after:always}}'
                 f'.toc,.revisions{{padding:15mm 18mm;page-break-after:auto}}'
                 f'</style></head>'
                 f'<body><main>{self._cover()}{self._toc()}{self._revisions()}'

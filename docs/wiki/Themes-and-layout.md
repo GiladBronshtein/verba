@@ -75,6 +75,21 @@ produces a sensible Word file rather than Times New Roman.
 `verba fonts` reports what the outputs will actually be set in **on this
 machine**, which settles most arguments about kerning before they start.
 
+## The cover
+
+Two parts, and nothing floats. A field carries the identity, and the sheet
+below it carries the facts:
+
+- the vendor as a small-caps eyebrow, the product as the only large thing on
+  the page, the subtitle under it, and a rule closing the field
+- a one-sentence lead from `document.lead` in `doc.yaml`, saying what the
+  reader is holding
+- the facts in two ruled columns, and the confidentiality line at the foot
+
+It used to run the vendor at 64pt and the product under it at 32pt, which on a
+document whose vendor and product share a word printed the same word twice, in
+two sizes, under a third of a page of nothing.
+
 ## The page
 
 ```bash

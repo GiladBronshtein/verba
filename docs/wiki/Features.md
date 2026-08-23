@@ -114,6 +114,8 @@ properly.
 |---|---|
 | **DOCX, PDF and HTML** | One content tree, three outputs |
 | **Derived numbering** | No section file carries a number, so inserting one renumbers the body and the contents page together |
+| **A cover that places its parts** | An identity field over a facts sheet, with a one-line lead, rather than three competing titles above empty space |
+| **Nothing explained twice** | The same control described in two tables of one section, in the same words, is reported |
 | **Typed blocks** | Headings, paragraphs, bullets, steps, callouts, figures, and five structured table kinds. See [Sections](Sections) |
 | **Figures and details** | A caption makes it a numbered figure; no caption makes it an inline detail |
 | **Cover and contents page** | Generated, with configurable depth |

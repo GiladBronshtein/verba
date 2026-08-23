@@ -63,6 +63,7 @@ built in set entirely. See [The writer](The-writer).
 | `CONTENT-01` | WARN | The section is empty. | Draft from the crawl | the system |
 | `CONTENT-02` | ERROR | It writes what the crawl can answer and offers to remove anything that was never a control. | Ask the writer to fill these in | the system |
 | `CONTENT-03` | ERROR | A placeholder or a tooltip is being documented as though it were the name of a control. The writer offers to remove them. | Ask the writer to tidy these | the system |
+| `CONTENT-04` | WARN | The same control is explained twice in one section, in two different tables, with the same words. A reader meets it, reads it, and then meets it again. | Ask the writer to tidy these | the system |
 | `DESIGN-01` | WARN | The mark has no drawn equivalent, so it prints as an emoji. | Add a drawn mark | you |
 | `DESIGN-02` | WARN | Console text below the type floor. | Edit app.css | you |
 | `DESIGN-03` | WARN | A browser dialog is used. | Replace with modal() | you |

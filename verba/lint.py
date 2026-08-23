@@ -14,6 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from .attest import is_attested
+from .model import LABEL_KEY
 
 ERROR, WARN, INFO = "error", "warning", "info"
 
@@ -244,6 +245,10 @@ REMEDIES = {
                                                  "does not exist."),
     "STRUCT-02":  ("Add it to the outline", "none", "The file exists but ships "
                                                     "nowhere."),
+    "CONTENT-04": ("Ask the writer to tidy these", "assist:polish",
+                   "The same control is explained twice in one section, in two "
+                   "different tables, with the same words. A reader meets it, "
+                   "reads it, and then meets it again."),
     "CONTENT-01": ("Draft from the crawl", "assist:draft", "The section is empty."),
     "CONTENT-03": ("Ask the writer to tidy these", "sweep",
                    "A placeholder or a tooltip is being documented as though it "
@@ -399,6 +404,32 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
             if where.startswith("paragraph") and text.count(", ") >= 4 and len(text) > 320:
                 add(Finding("STYLE-05", INFO, sid,
                             "long list-like paragraph, consider bullets", where))
+
+        # The same control, explained twice in one section. Two different block
+        # kinds carrying one label is legitimate: a field called Status and an
+        # action called Status are different things. Two carrying one label AND
+        # the same sentence is the same thing written down twice, and the
+        # reader meets it, reads it, and then meets it again.
+        said: dict[str, list] = {}
+        for b in sec.blocks:
+            key = LABEL_KEY.get(b.kind)
+            if not key:
+                continue
+            for item in b.items:
+                if not isinstance(item, dict) or not item.get(key):
+                    continue
+                body = " ".join(str(item.get(k, "")) for k in
+                                ("description", "definition")).strip().lower()
+                said.setdefault(str(item[key]).strip().lower(), []).append(
+                    (b.kind, re.sub(r"[^a-z0-9 ]", "", body)))
+        for label, seen in sorted(said.items()):
+            kinds = {k for k, _ in seen}
+            bodies = {b for _, b in seen if b}
+            if len(kinds) > 1 and len(bodies) == 1 and len(seen) > 1:
+                add(Finding("CONTENT-04", WARN, sid,
+                            f"{label!r} is explained twice in this section",
+                            f"once in the {' and once in the '.join(sorted(kinds))} "
+                            f"table, with the same wording"))
 
         # staleness
         lv = sec.last_verified
