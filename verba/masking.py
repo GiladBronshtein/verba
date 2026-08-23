@@ -190,6 +190,10 @@ def _matches(pattern: str, screen_id: str) -> bool:
     return fnmatch.fnmatch(screen_id, pattern)
 
 
+class MaskingRequired(RuntimeError):
+    """Masking was required on this connection and could not be done."""
+
+
 @dataclass
 class Masker:
     enabled: bool = True
@@ -228,17 +232,38 @@ class Masker:
                 "keep": self.keep,
                 "map": self.map, "counters": self.counters}
 
+    # Set from the connection. `mask_required: true` used to be checked in one
+    # place, against the --no-mask flag, which is the only way of turning
+    # masking off that anybody thought of. Masking that is on and empty, or on
+    # and broken, reached exactly the same outcome and nothing objected.
+    required: bool = False
+
     def active(self) -> bool:
         return bool(self.enabled and (self.literals or self.patterns or self.columns))
 
     # ------------------------------------------------------------------
     def apply(self, page, log=None, screen_id: str = "") -> list[dict]:
-        """Mask the live DOM. Returns what was replaced on this page."""
+        """Mask the live DOM. Returns what was replaced on this page.
+
+        Raises when this connection requires masking and it could not be done.
+        A failure here used to be one log line, after which the screenshot was
+        taken anyway: the rules never ran, the picture was of whatever was on
+        the screen, and the run reported masking as on because the config said
+        so. On a connection marked as holding real customer data, a picture
+        nobody masked is the one outcome that must not be reachable quietly.
+        """
         if not self.active():
+            if self.required:
+                raise MaskingRequired(
+                    "this connection is marked as holding real data, and "
+                    "content/masking.yaml has no columns, patterns or literals, "
+                    "so masking would do nothing")
             return []
         try:
             result = page.evaluate(MASK_JS, self.config(screen_id))
         except Exception as e:
+            if self.required:
+                raise MaskingRequired(f"masking could not run: {e}") from e
             if log:
                 log(f"    masking skipped: {e}")
             return []

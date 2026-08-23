@@ -89,7 +89,7 @@ PENDING_FIELDS = ('input[autocomplete="current-password"], '
 
 
 def hand_over(page, marker: str, timeout_s: int = 300, log=None,
-              tick=None, poll_ms: int = 400) -> bool:
+              tick=None, poll_ms: int = 400, on_product=None) -> bool:
     """Stop, and let the person finish signing in.
 
     This is the answer to every sign-in a machine cannot complete: a one-time
@@ -131,6 +131,11 @@ def hand_over(page, marker: str, timeout_s: int = 300, log=None,
             if not pending:
                 try:
                     if page.query_selector(marker):
+                        # Before the caller gets control back, so the permitted
+                        # window closes on the poll that sees the product rather
+                        # than whenever the caller gets round to it.
+                        if on_product:
+                            on_product()
                         emit("    signed in")
                         return True
                 except Exception:
@@ -170,14 +175,27 @@ def interactive_signin(env, root: Path, log=None, timeout_s: int = 300) -> dict:
     emit(f"this waits up to {timeout_s // 60} minutes and saves the session when "
          f"the product loads.")
 
+    # The guard belongs here more than anywhere else in this file. This function
+    # opens a visible browser at the customer's live product and hands the
+    # keyboard to a person for up to five minutes, and it used to do that with
+    # nothing attached at all: `verba env signin`, and the console's Sign in
+    # button, were the one path in the whole engine where a click reached the
+    # product. The guarantee everything else rests on had a door in it.
+    guard = Guard()
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=False, args=["--window-size=1440,900"])
         ctx = browser.new_context(viewport=VIEWPORT)
         page = ctx.new_page()
+        guard.attach(page, log=emit)
+        # Anything opened by the sign-in flow is its own Page and inherits no
+        # routes, which is how an identity provider's popup would have escaped.
+        ctx.on("page", lambda p: guard.attach(p, log=emit))
         page.goto(target, wait_until="domcontentloaded", timeout=60000)
 
-        saved = hand_over(page, marker, timeout_s=timeout_s, log=emit)
+        saved = hand_over(page, marker, timeout_s=timeout_s, log=emit,
+                          on_product=guard.reached_product)
         if saved:
+            guard.lock()
             ctx.storage_state(path=str(session))
             emit(f"  signed in, session saved to {session.name}")
 
@@ -192,7 +210,12 @@ def interactive_signin(env, root: Path, log=None, timeout_s: int = 300) -> dict:
         browser.close()
 
     info = env.session_info(root)
-    return {"saved": session.exists(), "recognised": saved, **info}
+    report = guard.report()
+    if report["blocked_writes"]:
+        emit(f"  {report['blocked_writes']} write attempt(s) were blocked while you "
+             f"were signing in")
+    return {"saved": session.exists(), "recognised": saved,
+            "readonly": report, **info}
 
 
 def verify(env, root: Path, log=None) -> dict:
@@ -223,9 +246,14 @@ def verify(env, root: Path, log=None) -> dict:
             kwargs["storage_state"] = str(sp)
             emit("using the saved browser session")
         ctx = browser.new_context(**kwargs)
+        ctx.on("page", lambda p: guard.attach(p, log=emit))
         page = ctx.new_page()
         page.set_default_timeout(25000)
         guard.attach(page, log=emit)
+        if env.auth in ("sso", "handoff", "none"):
+            # No form to submit on these, so the exemption buys nothing and
+            # would only be spent loading a fully authenticated product.
+            guard.reached_product()
 
         result: dict = {"ok": False}
         try:

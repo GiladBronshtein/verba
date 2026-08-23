@@ -382,13 +382,19 @@ class ConsoleState:
             envs = self.envs()
             env = envs.current()
             masker = self.masker()
+            masker.required = bool(env is not None and env.mask_required)
             if not mask:
-                if env is not None and env.mask_required:
+                if masker.required:
                     raise RuntimeError(
                         f"{env.label or env.id} is marked as holding real data, so "
                         f"screenshots cannot be captured unmasked. Uncheck that on the "
                         f"connection only if the data really is safe to publish.")
                 masker.enabled = False
+            if masker.required and not masker.active():
+                raise RuntimeError(
+                    f"{env.label or env.id} is marked as holding real data, and "
+                    f"Names has no rules in it, so masking would do nothing. Add a "
+                    f"rule under Names, or take the marking off the connection.")
             if env is not None:
                 ok, why = env.ready(self.root)
                 if not ok:

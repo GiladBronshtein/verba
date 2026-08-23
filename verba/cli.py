@@ -221,12 +221,22 @@ def cmd_capture(args):
         print(f"  registry warning: {warning}")
 
     masker = Masker.load(content / "masking.yaml", content / "masking-map.json")
+    masker.required = bool(env is not None and env.mask_required)
     if args.no_mask:
-        if env is not None and env.mask_required:
+        if masker.required:
             print(f"{env.label or env.id} holds real data, so it cannot be captured "
                   f"unmasked.")
             return 1
         masker.enabled = False
+    # Masking that is on and empty is masking that is off. This used to be
+    # checked only against --no-mask, so a connection marked as holding real
+    # data was crawled with no rules at all and reported masking as on.
+    if masker.required and not masker.active():
+        print(f"{env.label or env.id} is marked as holding real data, and "
+              f"content/masking.yaml has no columns, patterns or literals in it.")
+        print("Masking would do nothing, so this crawl is refused. Add a rule, or "
+              "take mask_required off the connection if the data really is safe.")
+        return 1
     stamp = datetime.now().strftime("%Y-%m-%dT%H%M%S")
     out = root / "capture" / stamp
     healer = Healer(enabled=bool(args.heal))

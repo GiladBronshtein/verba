@@ -1316,6 +1316,52 @@ def t_cover_and_duplicate_content():
     return "cover is a band and a sheet, and one control cannot be explained twice"
 
 
+@check("the sign-in window is guarded, and required masking cannot do nothing")
+def t_the_doors_the_audit_found():
+    """Two holes in the one guarantee everything else rests on.
+
+    `verba env signin` opened a visible browser at the customer's live product
+    and handed a person the keyboard for five minutes with no guard attached at
+    all: the single path in the engine where a click reached the product. And
+    `mask_required` was checked only against --no-mask, so masking that was
+    enabled with no rules in it, which is what `verba new` writes, protected
+    nothing while every report said masking was on.
+    """
+    import inspect
+
+    from verba import capture as cap_mod
+    from verba import signin as si
+    from verba.masking import Masker, MaskingRequired
+
+    src = inspect.getsource(si.interactive_signin)
+    ok("Guard()" in src and "guard.attach" in src,
+       "the interactive sign-in still opens an unguarded browser at the product")
+    ok("on_product=guard.reached_product" in src,
+       "the permitted window is not closed when the product appears")
+    ok('ctx.on("page"' in src,
+       "a popup during sign-in would be its own Page and inherit no guard")
+
+    # every context in the crawl, not just the first page
+    csrc = inspect.getsource(cap_mod.Capture.run)
+    eq(csrc.count('ctx.on("page"') + csrc.count('fresh.on("page"'), 3,
+       "a context in the crawl can still produce an unguarded page: ")
+    ok("reached_product" in inspect.getsource(cap_mod.Capture._session_still_works),
+       "a saved session still loads the product with writes permitted")
+
+    # masking that is on and empty is masking that is off
+    m = Masker(enabled=True)
+    ok(not m.active(), "an empty masker reported itself active")
+    m.required = True
+    try:
+        m.apply(None)
+        raise AssertionError("required masking with no rules did not refuse")
+    except MaskingRequired:
+        pass
+    m.required = False
+    eq(m.apply(None), [], "masking that is not required refused anyway: ")
+    return "the sign-in browser is guarded, popups are guarded, empty masking refuses"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1359,6 +1405,7 @@ def main() -> int:
              t_only_actionable_work_is_reported,
              t_themes_ship_and_never_stop_a_build,
              t_cover_and_duplicate_content,
+             t_the_doors_the_audit_found,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,

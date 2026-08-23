@@ -245,7 +245,16 @@ class Capture:
             raise ValueError(f"unknown capture step: {step}")
 
     def _session_still_works(self, page, emit) -> bool:
-        """Does the saved session actually get us in, or has it lapsed?"""
+        """Does the saved session actually get us in, or has it lapsed?
+
+        Read-only throughout. There is no form to submit on this path: either
+        the session works, in which case this loads the signed-in product and
+        nothing should be written to it, or it does not, in which case the
+        caller starts again with a fresh context. Spending the sign-in
+        exemption here meant every hand-over crawl on its happy path loaded the
+        authenticated product with writes permitted.
+        """
+        self.guard.reached_product()
         marker = self.site.get("signed_in_when") or "nav a, aside a, [role=tab], table"
         base = (self.site.get("base_url") or "").rstrip("/")
         try:
@@ -284,7 +293,8 @@ class Capture:
             emit("  including any code, prompt or key. The crawl carries on")
             emit("  by itself the moment the product is on screen.")
             ok = hand_over(page, marker, timeout_s=self.handoff_timeout_s,
-                           log=emit, tick=self.on_wait)
+                           log=emit, tick=self.on_wait,
+                           on_product=self.guard.reached_product)
             if ok:
                 self.guard.reached_product()
                 self.handed_over = True
@@ -323,6 +333,9 @@ class Capture:
             if have_session:
                 ctx_args["storage_state"] = state
             ctx = browser.new_context(**ctx_args)
+            # Routes are per Page, so a window.open or target=_blank during
+            # sign-in produced a Page with no guard on it at all.
+            ctx.on("page", lambda p: self.guard.attach(p, log=emit))
             page = ctx.new_page()
             page.set_default_timeout(DEFAULT_TIMEOUT)
             self.guard.attach(page, log=emit)
@@ -342,6 +355,7 @@ class Capture:
                         browser = pw.chromium.launch(headless=False)
                     ctx = browser.new_context(viewport=VIEWPORT,
                                               device_scale_factor=1)
+                    ctx.on("page", lambda p: self.guard.attach(p, log=emit))
                     page = ctx.new_page()
                     page.set_default_timeout(DEFAULT_TIMEOUT)
                     self.guard.attach(page, log=emit)
@@ -375,6 +389,7 @@ class Capture:
                         emit(f"  {screen.id}: using a signed-out browser")
                         fresh = browser.new_context(viewport=VIEWPORT,
                                                     device_scale_factor=1)
+                        fresh.on("page", lambda p: self.guard.attach(p, log=emit))
                         fpage = fresh.new_page()
                         fpage.set_default_timeout(DEFAULT_TIMEOUT)
                         self.guard.attach(fpage, log=emit)
@@ -466,6 +481,13 @@ class Capture:
         _await_quiet(page)
         self._live_frame(page, screen, "settled")
 
+        if not screen.mask and self.masker.required:
+            # `mask: false` opts one screen out of masking. On a connection
+            # holding real data that is the same picture by another route.
+            from .masking import MaskingRequired
+            raise MaskingRequired(
+                f"{screen.id} sets mask: false, and this connection is marked as "
+                f"holding real data")
         masked = (self.masker.apply(page, log=emit, screen_id=screen.id)
                   if screen.mask else [])
         self._live_frame(page, screen, "masked")
