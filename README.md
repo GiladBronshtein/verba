@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/license-MIT-3137DB)](LICENSE)
 [![Writes to your system](https://img.shields.io/badge/writes%20to%20your%20system-blocked%20in%20the%20browser-1F9D55)](#what-it-can-never-do-to-your-system)
 
-**[Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#what-it-can-never-do-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](docs/wiki/Home.md)**
+**[What it caught](#what-it-found-in-a-real-manual) &middot; [Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#what-it-can-never-do-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](docs/wiki/Home.md)**
 
 </div>
 
@@ -36,6 +36,24 @@ the work without asking.
 </div>
 
 ---
+
+## What it found in a real manual
+
+A 38-section operator manual for a live advertising platform, built with this
+engine and shipped for a year. Every one of these was found by the tool, not by
+a person, and every one had been read past by people who knew the product.
+
+| It found | Because |
+|---|---|
+| A chapter calling the product **"Rise Platform 2.0"**, a name that does not exist | It reads prose against the product's own description, so an invented name is a contradiction and not a typo |
+| **Supply** and **Demand** explained twice in one section, in identical words | Two tables, two block kinds, one control. No rule compared them until one did |
+| A **Dashboard** chapter illustrated with a picture of the **accounts list** | A screenshot is checked against what its section says it shows |
+| Ten Word callouts reading **"note Note:"** in a released file | The name of a drawn mark, printed as text, in a deliverable sent to customers |
+| **39 of 43** picture verdicts that could never expire | They were fingerprinted against a folder the pictures are not in |
+| The manual claiming **38 human checks** that nobody had made | A date is not a signature, and the rule that should have caught it accepted one |
+
+None of these are typos. Every one is the kind of thing that survives a careful
+read, because a careful read is exactly what produced them.
 
 ## Two minutes
 

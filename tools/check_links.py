@@ -84,8 +84,12 @@ def check(offline: bool = False) -> int:
         if not path.exists():
             continue
         raw = path.read_text(encoding="utf-8")
-        here = anchors(raw)
         text = without_code(raw)
+        # Anchors from the prose only. A page showing an example of a settings
+        # file has "## Vocabulary" inside a fence, which is code and not a
+        # heading, and counting it would let a link to a heading that does not
+        # exist pass.
+        here = anchors(text)
         rel = path.relative_to(ROOT)
         in_wiki = path.parent == WIKI
 
