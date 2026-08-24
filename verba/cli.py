@@ -29,7 +29,8 @@ verba note "..."             write down something you noticed
     verba drift                  compare the newest capture to the document
     verba section new|show|set   manage one section
     verba release                cut a version, never overwriting an output
-    verba changelog              print the derived changelog
+    verba changes --since vN     what changed since that release
+verba changelog              print the derived changelog
     verba history [section]      every recorded change, and restore one
     verba console                open the management console in a browser
 """
@@ -1247,6 +1248,49 @@ def cmd_accept(args):
     return 0
 
 
+def cmd_changes(args):
+    """What has changed since a release, or since the last one."""
+    from .version import ReleaseStore
+    p = _project(args)
+    store = ReleaseStore(args.root)
+    profile = p.profile.name
+    known = store.versions(profile)
+    if not known:
+        print("no releases yet, so there is nothing to compare against.")
+        print("cut one with: python3 -m verba release --version v1")
+        return 0
+
+    if args.since:
+        previous = store.find(args.since, profile)
+        if previous is None:
+            print(f"no release {args.since!r} in this edition.")
+            print(f"there is: {', '.join(known)}")
+            return 1
+    else:
+        previous = store.latest(profile)
+
+    d = store.diff(p, previous)
+    said = store.describe(p, d)
+    where = previous.get("version", "?")
+    when = previous.get("date", "")
+    print(f"since {where}{f' ({when})' if when else ''}, edition {profile}:\n")
+    if not said:
+        print("  nothing. The document reads exactly as it did then.")
+        return 0
+    print(f"  {said}\n")
+
+    titles = {n.id: f"{n.number} {n.title}" for n in p.nodes}
+    for label, key in (("revised", "changed"), ("new", "added"),
+                       ("removed", "removed"), ("renumbered", "renumbered")):
+        for sid in d.get(key, []):
+            print(f"  {label:11} {titles.get(sid, sid)}")
+    for a in d.get("changed_assets", []):
+        print(f"  {'repictured':11} {a}")
+    for a in d.get("new_assets", []):
+        print(f"  {'new picture':11} {a}")
+    return 0
+
+
 def cmd_release(args):
     p = _project(args)
     findings = lint(p)
@@ -1535,6 +1579,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--screen")
     s.add_argument("--date")
     s.add_argument("--who", help="who is accepting it")
+
+    ch = sub.add_parser("changes")
+    ch.add_argument("--since", help="a release to compare against, such as v30")
+    ch.set_defaults(func=cmd_changes)
 
     ac = sub.add_parser("accept")
     ac.add_argument("--id", help="comma separated section ids")

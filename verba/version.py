@@ -58,6 +58,27 @@ class ReleaseStore:
                 return r
         return None
 
+    def find(self, version: str, profile: str | None = None) -> dict | None:
+        """One release by name, however the person wrote the number.
+
+        `diff` has always taken any previous release, so comparing against a
+        named one needed nothing but a way to name it. Until this existed the
+        only comparison anybody could reach was against the newest release, and
+        "what changed since v30" had no answer at all, on a tool whose whole
+        subject is what changed.
+        """
+        want = str(version or "").strip().lstrip("vV")
+        for r in reversed(self.releases):
+            if profile is not None and r.get("profile") != profile:
+                continue
+            if str(r.get("version", "")).lstrip("vV") == want:
+                return r
+        return None
+
+    def versions(self, profile: str | None = None) -> list:
+        return [r["version"] for r in self.releases
+                if profile is None or r.get("profile") == profile]
+
     def next_version(self, profile: str | None = None) -> str:
         nums = [int(str(r["version"]).lstrip("v").split(".")[0])
                 for r in self.releases if str(r["version"]).lstrip("v").split(".")[0].isdigit()]

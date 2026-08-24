@@ -231,6 +231,21 @@ compared with what your sections claim.
 High confidence items apply on their own. Anything needing judgement says so
 instead of offering a button.
 
+That is drift against the live system. For drift against your own last
+published version, name it:
+
+```
+$ verba changes --since v30
+
+since v30 (2026-08-22), edition generic:
+
+  19 section(s) revised: 1.2 Scope and Audience, 1.3 Platform Overview, ...
+
+  revised     1.2 Scope and Audience
+  revised     1.3 Platform Overview
+  repictured  supply-management-publisher-settings-1.png
+```
+
 ## A capture proves a control exists. It does not prove what it means.
 
 So the writer is told to leave `TODO: describe this.` rather than invent a
@@ -451,6 +466,7 @@ To watch drift appear, change Meridian: rename a column in
 | `verba capture` | crawl the live system into a timestamped run |
 | `verba capture --wait-for-signin` | wait while you sign in, second factor and all |
 | `verba drift` | compare the newest capture to the document |
+| `verba changes --since v30` | what changed in the document since that release |
 | `verba fix` | settle everything the system can, and say what is left |
 | `verba fix --full` | photograph every screen first, then do that |
 | `verba auto` | the whole loop, stopping only where you are needed |

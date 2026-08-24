@@ -33,6 +33,15 @@ an older run.
 Run the content rules. `--strict` exits non-zero on errors, for CI. See the
 [Rule reference](Rule-reference).
 
+### `verba changes [--since vN]`
+What changed in the document since a release you name, or since the newest one.
+Sections revised, added, removed and renumbered, and pictures replaced. Naming
+a release that does not exist says which ones do.
+
+Until this existed the only comparison anybody could reach was against the
+newest release, so "what changed since v30" had no answer, on a tool whose
+whole subject is what changed.
+
 ### `verba knowledge` / `verba decisions` / `verba changelog`
 What the crawl has learned, what has been decided, and the derived changelog.
 

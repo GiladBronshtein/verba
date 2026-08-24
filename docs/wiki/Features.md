@@ -120,6 +120,7 @@ properly.
 | **Figures and details** | A caption makes it a numbered figure; no caption makes it an inline detail |
 | **Cover and contents page** | Generated, with configurable depth |
 | **Versioned releases** | `release --version v2` refuses to overwrite an output |
+| **Compare against any release** | `verba changes --since v30` says what the document has done since a version you name, not only since the newest |
 | **Derived changelog** | Built from what actually changed |
 
 ## Editions and design

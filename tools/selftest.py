@@ -1502,6 +1502,56 @@ def t_recording_is_not_authoring():
     return "a baseline keeps the signature, a model edit drops it, shots are fingerprinted"
 
 
+@check("what changed since a named release has an answer")
+def t_compare_against_a_named_release():
+    """The promise is to compare the document against the last one.
+
+    Until this, the only comparison anybody could reach was against the newest
+    release, and only while cutting a new one or drawing a console banner.
+    "What changed since v30" had no answer at all, on a tool whose whole
+    subject is what changed. diff() always took any previous release; there was
+    simply no way to name one.
+    """
+    import subprocess
+
+    from verba.project import Project
+    from verba.version import ReleaseStore
+
+    root = fresh()
+    proj = Project.load(root)
+    store = ReleaseStore(root)
+    eq(store.versions(), [], "a new project already has releases: ")
+
+    store.record(store.snapshot(proj, "v1"))
+    sec = next(iter(Project.load(root).sections.values()))
+    sec.path.write_text(sec.path.read_text(encoding="utf-8")
+                        + "\n\nA line written after v1.\n", encoding="utf-8")
+    store2 = ReleaseStore(root)
+    store2.record(store2.snapshot(Project.load(root), "v2"))
+
+    ok(store2.find("v1"), "a release could not be found by its name")
+    ok(store2.find("1"), "a version without its v was not recognised")
+    ok(store2.find("v99") is None, "a version that does not exist was found")
+
+    d = store2.diff(Project.load(root), store2.find("v1"))
+    ok(sec.id in d["changed"],
+       f"the section edited after v1 is not reported as changed: {d}")
+
+    repo = Path(__file__).resolve().parents[1]
+    r = subprocess.run([sys.executable, "-m", "verba", "--root", str(root),
+                        "changes", "--since", "v1"],
+                       capture_output=True, text=True, cwd=str(repo))
+    eq(r.returncode, 0, f"verba changes failed: {r.stderr[-200:]}")
+    ok("since v1" in r.stdout, f"the output does not say what it compared: {r.stdout[:120]}")
+
+    bad = subprocess.run([sys.executable, "-m", "verba", "--root", str(root),
+                          "changes", "--since", "v77"],
+                         capture_output=True, text=True, cwd=str(repo))
+    eq(bad.returncode, 1, "asking for a release that does not exist succeeded: ")
+    ok("there is:" in bad.stdout, "the refusal does not say which releases exist")
+    return "a named release can be compared against, and a missing one says which exist"
+
+
 @check("a rule cannot quietly stop reporting")
 def t_rules_are_held_to_a_corpus():
     """The move that is always available when a list will not empty.
@@ -1548,6 +1598,7 @@ def main() -> int:
              t_the_doors_the_audit_found,
              t_failures_are_explained,
              t_recording_is_not_authoring,
+             t_compare_against_a_named_release,
              t_rules_are_held_to_a_corpus,
              t_model_calls_are_bounded_and_counted,
              t_verified_costs_something,
