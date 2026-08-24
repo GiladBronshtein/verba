@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/license-MIT-3137DB)](LICENSE)
 [![Writes to your system](https://img.shields.io/badge/writes%20to%20your%20system-blocked%20in%20the%20browser-1F9D55)](#what-it-can-never-do-to-your-system)
 
-**[Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#what-it-can-never-do-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](https://github.com/GiladBronshtein/verba/wiki)**
+**[Two minutes](#two-minutes) &middot; [What it does](#what-it-does) &middot; [See it](#see-it) &middot; [Safety](#what-it-can-never-do-to-your-system) &middot; [Try the demo](#try-it-yourself) &middot; [Wiki](docs/wiki/Home.md)**
 
 </div>
 
@@ -125,7 +125,8 @@ pictures.
 | **DOCX, PDF and HTML** | One content tree, three outputs |
 | **Derived numbering** | Section files carry no number, so inserting one renumbers the body and the contents page together |
 | **Editions** | One tree, several documents. An edition declares what it carries |
-| **Themes** | Five, each contrast-measured rather than eyeballed |
+| **Your mark on the cover** | `document.logo` in `doc.yaml`, drawn by both renderers |
+| **Themes** | Five, each contrast-measured rather than eyeballed, and a project may carry its own |
 | **Page setup** | Paper, margins, alignment, hyphenation, figure width, contents depth. PDF and Word read the same numbers |
 | **Versioned releases** | `release --version v2` refuses to overwrite an output |
 
@@ -487,22 +488,27 @@ silently discarding every section's own note.
 
 ## Documentation
 
-The [wiki](https://github.com/GiladBronshtein/verba/wiki) is the long form, and
-**[Features](https://github.com/GiladBronshtein/verba/wiki/Features)** is
+The [wiki](docs/wiki/Home.md) is the long form, and
+**[Features](docs/wiki/Features.md)** is
 everything it does in one list.
 
 | | | |
 |---|---|---|
-| [Features](https://github.com/GiladBronshtein/verba/wiki/Features) | [Installation](https://github.com/GiladBronshtein/verba/wiki/Installation) | [Your first document](https://github.com/GiladBronshtein/verba/wiki/Your-first-document) |
-| [The loop](https://github.com/GiladBronshtein/verba/wiki/The-loop) | [Console guide](https://github.com/GiladBronshtein/verba/wiki/Console-guide) | [Project layout](https://github.com/GiladBronshtein/verba/wiki/Project-layout) |
-| [Sections](https://github.com/GiladBronshtein/verba/wiki/Sections) | [Screens registry](https://github.com/GiladBronshtein/verba/wiki/Screens-registry) | [Connections and sign in](https://github.com/GiladBronshtein/verba/wiki/Connections-and-sign-in) |
-| [Masking and names](https://github.com/GiladBronshtein/verba/wiki/Masking-and-names) | [Editions](https://github.com/GiladBronshtein/verba/wiki/Editions) | [Themes and layout](https://github.com/GiladBronshtein/verba/wiki/Themes-and-layout) |
-| [The writer](https://github.com/GiladBronshtein/verba/wiki/The-writer) | [The read only guarantee](https://github.com/GiladBronshtein/verba/wiki/The-read-only-guarantee) | [Healing selectors](https://github.com/GiladBronshtein/verba/wiki/Healing-selectors) |
-| [Rule reference](https://github.com/GiladBronshtein/verba/wiki/Rule-reference) | [CLI reference](https://github.com/GiladBronshtein/verba/wiki/CLI-reference) | [Architecture](https://github.com/GiladBronshtein/verba/wiki/Architecture) |
-| [Troubleshooting](https://github.com/GiladBronshtein/verba/wiki/Troubleshooting) | [FAQ](https://github.com/GiladBronshtein/verba/wiki/FAQ) | [Contributing](https://github.com/GiladBronshtein/verba/wiki/Contributing) |
+| [Features](docs/wiki/Features.md) | [Installation](docs/wiki/Installation.md) | [Your first document](docs/wiki/Your-first-document.md) |
+| [The loop](docs/wiki/The-loop.md) | [Console guide](docs/wiki/Console-guide.md) | [Project layout](docs/wiki/Project-layout.md) |
+| [Sections](docs/wiki/Sections.md) | [Screens registry](docs/wiki/Screens-registry.md) | [Connections and sign in](docs/wiki/Connections-and-sign-in.md) |
+| [Masking and names](docs/wiki/Masking-and-names.md) | [Editions](docs/wiki/Editions.md) | [Themes and layout](docs/wiki/Themes-and-layout.md) |
+| [The writer](docs/wiki/The-writer.md) | [The read only guarantee](docs/wiki/The-read-only-guarantee.md) | [Healing selectors](docs/wiki/Healing-selectors.md) |
+| [Rule reference](docs/wiki/Rule-reference.md) | [CLI reference](docs/wiki/CLI-reference.md) | [Architecture](docs/wiki/Architecture.md) |
+| [Troubleshooting](docs/wiki/Troubleshooting.md) | [FAQ](docs/wiki/FAQ.md) | [Contributing](docs/wiki/Contributing.md) |
 
-Its source is `docs/wiki/` in this repository, so wiki pages are reviewed in
-pull requests like anything else and published with `tools/publish-wiki.sh`.
+These are files in this repository, so they render here, they are reviewed in
+pull requests like anything else, and every link to them works. The same pages
+publish to the GitHub Wiki tab with `tools/publish-wiki.sh` once a wiki exists;
+GitHub only creates one when a first page is saved by hand, and until then it
+answers every wiki address with a 200 and a redirect to the repository home,
+which is a broken link that no status check can see.
+`python3 tools/check_links.py` knows the difference.
 
 ## Contributing
 

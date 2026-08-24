@@ -131,6 +131,10 @@ properly.
 | **Self-extending neutral edition** | The names it must not print are read off your other editions |
 | **Five themes** | Each contrast measured rather than eyeballed. See [Themes and layout](Themes-and-layout) |
 | **A palette of your own** | A project may carry its own themes, and a missing one renders in the default and reports the substitution rather than failing the build |
+| **Your logo on the cover** | `document.logo` in `doc.yaml`, drawn by both renderers, sized to fit and simply absent when unset |
+| **The Word cover follows your theme** | It was a raster with one palette painted in, so the body followed you and the cover did not |
+| **Covers fit any company name** | The size was tuned for four letters and nothing measured the string |
+| **Covers render off macOS** | The font list was two absolute macOS paths, so every string fell back to a bitmap face elsewhere |
 | **Four typefaces** | Each with its own body size, line height, tracking, and a DOCX fallback |
 | **Page setup** | Paper, margins, header and footer bands, alignment, hyphenation, figure width, contents depth |
 | **Judged before written** | A layout change is checked against the page you are choosing, all or nothing |
@@ -161,5 +165,6 @@ properly.
 | **Verdicts expire with their picture** | A picture judgement is fingerprinted against the image it judged, so a screen photographed again is looked at again rather than silenced by a stale ruling |
 | **Notes** | `verba note "..."` and the loop does what you asked on its next run |
 | **Locked atomic writes** | Two consoles cannot lose each other's work |
+| **Every link checked** | `tools/check_links.py` walks the README and every wiki page: files, images, anchors, page names and each external address |
 | **Start without a blank page** | `verba new` asks six questions and writes a project that builds |
 | **A demo that ships** | A fictional product and a document built from it, in the repository |

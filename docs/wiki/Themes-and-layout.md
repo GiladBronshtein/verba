@@ -26,6 +26,25 @@ verba themes --check    # measure its contrast
 painted on, not against white. A palette that passes on paper and fails in a
 panel is the normal way this goes wrong.
 
+## Your mark on the cover
+
+```yaml
+# content/doc.yaml
+document:
+  logo: content/assets/logo.png
+```
+
+Both renderers draw it, sized to fit rather than scaled to a box, because a
+logo is whatever shape it is and forcing one into a box is how a wordmark ends
+up squashed. A mark that is named but not on disk is left out and the cover
+still prints: failing a release over one file helps nobody.
+
+The Word cover reads the theme too. It used to be a raster image with one
+company's palette painted into it, so whichever theme you chose the body
+followed you and the cover did not. It also fits the vendor name now, at any
+length, and falls back through faces that exist on Linux and Windows rather
+than two absolute macOS paths.
+
 ## A palette of your own
 
 A house palette belongs to the document, not to the engine: it is the one

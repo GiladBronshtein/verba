@@ -30,7 +30,7 @@ my-docs/
 
 | File | What it decides |
 |---|---|
-| `doc.yaml` | Product and document metadata, the outline, build defaults, and any documented rule suppressions |
+| `doc.yaml` | Product and document metadata, the outline, build defaults, `document.logo`, and any documented rule suppressions |
 | `system.md` | What the product is, its vocabulary, and the domain rules the writer must not contradict. Given to the model ahead of every task |
 | `house.md` | Your own writing rules. Falls back to a built in set when absent |
 | `screens.yaml` | The registry. See [Screens registry](Screens-registry) |

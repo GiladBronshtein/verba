@@ -67,6 +67,15 @@ approach was tried and abandoned. Several of them describe a bug that reached
 production once. Keep that habit: a comment recording what went wrong is worth
 more than one restating what the line does.
 
+## Before you open a pull request
+
+```bash
+python3 tools/selftest.py         # the suite
+python3 tools/rule_baseline.py    # what the rules say about the corpus
+python3 tools/check_links.py      # every link in the README and the wiki
+python3 -m ruff check verba tools
+```
+
 ## Reporting a bug
 
 Include `review/auto.json` from the run, the output of `verba status`, and the
