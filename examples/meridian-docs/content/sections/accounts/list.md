@@ -16,6 +16,7 @@ Every account in the workspace, searchable and filterable by status.
 - column: Region
   description: Where this account's events are processed
 - column: OWNER
+  description: The person accountable for this account inside your organisation
 ```
 
 Filter the list with the status buttons above the table.

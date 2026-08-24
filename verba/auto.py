@@ -555,9 +555,17 @@ class Auto:
             if sec is None:
                 continue
             text = sec.path.read_text(encoding="utf-8")
-            kept, dropped = [], 0
+            kept, dropped, fenced = [], 0, False
             for line in text.splitlines(keepends=True):
-                if artifact.match(line.strip()):
+                if line.lstrip().startswith("```"):
+                    fenced = not fenced
+                # Inside a fence that same line is not wreckage, it is the
+                # writer declining to invent a meaning the evidence does not
+                # support, which is the whole reason the marker exists and what
+                # CONTENT-02 refuses to ship. Deleting it there cleared the
+                # error by taking the description away, so an action was left
+                # documented by nothing and every rule reported an improvement.
+                if not fenced and artifact.match(line.strip()):
                     dropped += 1
                     continue
                 kept.append(line)

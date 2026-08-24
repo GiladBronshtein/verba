@@ -1,5 +1,7 @@
 {
-  "at": "2026-08-23T00:09:06",
+  "at": "2026-08-24T08:27:04",
   "proposals": [],
-  "skipped": []
+  "skipped": [
+    "accounts.list: the writer answered none of 1 name(s)"
+  ]
 }

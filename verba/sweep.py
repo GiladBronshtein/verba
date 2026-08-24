@@ -48,13 +48,31 @@ class Proposal:
 
 
 def count_todos(section) -> int:
+    """How many descriptions this section still owes.
+
+    A marker and an empty entry are the same debt: one says the writer looked
+    and declined, the other says nobody has been asked. Counting only markers
+    meant a section whose marker had been deleted reported nothing owing, so
+    the gap-filling step passed over it every round while the control sat in a
+    table with nothing said about it.
+    """
     n = 0
     for b in section.blocks:
         if TODO.search(b.text or ""):
             n += 1
         for it in b.items:
             if isinstance(it, dict):
-                n += sum(1 for v in it.values() if isinstance(v, str) and TODO.search(v))
+                marks = sum(1 for v in it.values()
+                            if isinstance(v, str) and TODO.search(v))
+                if marks:
+                    n += marks
+                    continue
+                named = (it.get("field") or it.get("name") or it.get("action")
+                         or it.get("column") or it.get("term") or "")
+                said = " ".join(str(it.get(k, "")) for k in
+                                ("description", "definition")).strip()
+                if named and not said:
+                    n += 1
             elif TODO.search(str(it)):
                 n += 1
     return n
@@ -161,19 +179,28 @@ def _all_names(section) -> list[str]:
 
 
 def _unwritten_names(section) -> list[str]:
-    """The names that still lack a description, in the order they appear."""
+    """The names that still lack a description, in the order they appear.
+
+    Two shapes mean the same thing. A marker says the writer looked and
+    declined; no description key at all says nobody has been asked yet. This
+    only knew about the marker, so an entry with nothing against it was not a
+    gap to fill and the loop reported nothing to do while a control sat in a
+    table with nothing said about it.
+    """
     out = []
     for b in section.blocks:
         for it in (b.items or []):
             if not isinstance(it, dict):
                 continue
-            for value in it.values():
-                if isinstance(value, str) and TODO.search(value):
-                    name = (it.get("field") or it.get("name") or it.get("action")
-                            or it.get("column") or it.get("term") or "")
-                    if name and str(name) not in out:
-                        out.append(str(name))
-                    break
+            name = (it.get("field") or it.get("name") or it.get("action")
+                    or it.get("column") or it.get("term") or "")
+            if not name:
+                continue
+            said = " ".join(str(it.get(k, "")) for k in
+                            ("description", "definition")).strip()
+            marked = any(isinstance(v, str) and TODO.search(v) for v in it.values())
+            if (marked or not said) and str(name) not in out:
+                out.append(str(name))
     return out
 
 
@@ -215,7 +242,13 @@ def _ask_for_descriptions(sec, node, wanted, inv, notes, emit, root=".") -> dict
     result = assist.run_model(prompt, timeout=240, root=root, task="fill the gaps")
     if not result.ok:
         emit(f"    the writer could not be reached: {(result.error or '')[:80]}")
-        return {}
+        # A pair, because that is what every caller unpacks. Returning a bare
+        # dict here raised a ValueError out of the sweep, and `verba capture`
+        # runs the sweep at the end of every crawl, so a model that could not
+        # be reached discarded a crawl that had already signed in and
+        # photographed every screen. Nothing in a crawl should be able to throw
+        # the crawl away.
+        return {}, []
 
     answers, declined = {}, []
     for line in (result.output or "").splitlines():
@@ -250,23 +283,55 @@ def _splice(text: str, answers: dict) -> tuple[str, int]:
     descriptions that were waiting to be written.
     """
     lines = text.splitlines(keepends=True)
-    current, filled = None, 0
     name_key = re.compile(r"^(\s*-?\s*)(field|name|action|column|term):\s*(.+?)\s*$")
     desc_key = re.compile(r"^(\s*)description:\s*(.+?)\s*$")
 
-    for i, line in enumerate(lines):
+    # Two shapes to write into. A marker is replaced where it stands. An entry
+    # with no description line at all has nowhere to replace, so one is
+    # inserted under its name: without this the writer answered, the answer had
+    # no home, and the sweep reported nothing to propose while the control it
+    # had just described sat in the table with nothing against it.
+    out, i, filled = [], 0, 0
+    while i < len(lines):
+        line = lines[i]
         m = name_key.match(line)
-        if m:
-            current = m.group(3).strip().strip("'\"")
+        if not m:
+            out.append(line)
+            i += 1
             continue
-        d = desc_key.match(line)
-        if d and current and TODO.search(d.group(2)):
-            answer = answers.get(current)
-            if answer:
-                lines[i] = f"{d.group(1)}description: {_quote(answer)}\n"
-                filled += 1
-                current = None
-    return "".join(lines), filled
+
+        name = m.group(3).strip().strip("'\"")
+        out.append(line)
+        i += 1
+        indent = " " * (len(line) - len(line.lstrip()))
+        if line.lstrip().startswith("-"):
+            indent += "  "
+
+        # everything belonging to this entry, and whether it says anything
+        entry, has_desc = [], False
+        while i < len(lines):
+            nxt = lines[i]
+            if not nxt.strip():
+                entry.append(nxt); i += 1; continue
+            lead = len(nxt) - len(nxt.lstrip())
+            if lead <= len(m.group(1).rstrip()) or nxt.lstrip().startswith("```"):
+                break
+            if name_key.match(nxt):
+                break
+            d = desc_key.match(nxt)
+            if d:
+                has_desc = True
+                if TODO.search(d.group(2)) and answers.get(name):
+                    nxt = f"{d.group(1)}description: {_quote(answers[name])}\n"
+                    filled += 1
+            entry.append(nxt); i += 1
+
+        if not has_desc and answers.get(name):
+            out.append(f"{indent}description: {_quote(answers[name])}\n")
+            filled += 1
+        out.extend(entry)
+
+    return "".join(out), filled
 
 
 def _drop_items(text: str, names: list[str]) -> tuple[str, int]:

@@ -301,6 +301,10 @@ REMEDIES = {
                                                  "does not exist."),
     "STRUCT-02":  ("Add it to the outline", "none", "The file exists but ships "
                                                     "nowhere."),
+    "CONTENT-05": ("Ask the writer to fill these in", "sweep",
+                   "A control is listed with no description at all, so the "
+                   "table names it and says nothing about it. Either describe "
+                   "it, or take the entry out if it was never a control."),
     "CONTENT-04": ("Ask the writer to tidy these", "assist:polish",
                    "The same control is explained twice in one section, in two "
                    "different tables, with the same words. A reader meets it, "
@@ -483,6 +487,28 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
             if where.startswith("paragraph") and text.count(", ") >= 4 and len(text) > 320:
                 add(Finding("STYLE-05", INFO, sid,
                             "long list-like paragraph, consider bullets", where))
+
+        # A control listed with nothing said about it. CONTENT-02 catches the
+        # writer's marker and refuses to ship it, so the way to a green build
+        # was to delete the marker, which a step meant for clearing wreckage
+        # duly did. That left an action named in a table with no description
+        # at all, and every rule reported the document had improved.
+        blank = []
+        for b in sec.blocks:
+            key = LABEL_KEY.get(b.kind)
+            if not key:
+                continue
+            for item in b.items:
+                if not isinstance(item, dict) or not item.get(key):
+                    continue
+                said = " ".join(str(item.get(k, "")) for k in
+                                ("description", "definition")).strip()
+                if not said:
+                    blank.append(str(item[key]).strip())
+        if blank:
+            add(Finding("CONTENT-05", ERROR, sid,
+                        f"{len(blank)} control(s) listed with no description",
+                        ", ".join(sorted(blank)[:6])))
 
         # The same control, explained twice in one section. Two different block
         # kinds carrying one label is legitimate: a field called Status and an
