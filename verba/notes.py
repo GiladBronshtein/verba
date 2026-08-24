@@ -187,7 +187,7 @@ def resolve(note: Note, project, root: Path, log=None) -> tuple[str, str]:
 
     prompt = ASK.format(note=note.text, where=where,
                         section=_numbered(body), evidence=evidence)
-    result = assist.run_model(prompt, timeout=300)
+    result = assist.run_model(prompt, timeout=300, root=root, task="do what you asked")
     if not result.ok:
         return STUCK, f"the writer could not be reached: {(result.error or '')[:120]}"
 

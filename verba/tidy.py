@@ -177,7 +177,7 @@ class Tidy:
                                good="\n".join(good) or "  (none)",
                                bad="\n".join(badlines),
                                evidence=evidence)
-        result = assist.run_model(prompt, timeout=300)
+        result = assist.run_model(prompt, timeout=300, root=self.root, task="fix the writing")
         if not result.ok:
             emit(f"    the writer could not be reached: {(result.error or '')[:90]}")
             return []

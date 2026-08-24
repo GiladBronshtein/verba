@@ -51,6 +51,14 @@ def print_css(face, page=None, text=None, theme=None) -> str:
             .replace("$TOP", _mm(page.margin_top if page else 24))
             .replace("$BOT", _mm(page.margin_bottom if page else 20))
             .replace("$PAPER", page.paper_name if page else "A4")
+            # The cover was 257mm and 297mm, written in twice, which is A4 and
+            # only A4. `verba layout` offers Letter, A5 and Legal and prints the
+            # Letter command as advice, and taking that advice pushed the cover
+            # onto a second page carrying nothing but the confidentiality line.
+            .replace("$SHEETH", _mm(page.height_mm if page else 297))
+            .replace("$COVERH", _mm((page.height_mm if page else 297)
+                                    - (page.margin_top if page else 24)
+                                    - (page.margin_bottom if page else 20)))
             # The palette is the project's, not this file's. It used to be five
             # literal hex values here, which meant every document ever built by
             # this engine came out in one company's brand.
@@ -101,7 +109,7 @@ nav,.meta,.driftbox{display:none !important}
    Now the page has two parts. A field carries the identity, and the sheet below
    it carries the facts. Nothing floats, and the title is the only large thing
    on the page. */
-.cover{height:257mm;page-break-after:always;padding:0;
+.cover{height:$COVERHmm;page-break-after:always;padding:0;
   display:flex;flex-direction:column}
 .cover .band{height:132mm;background:var(--hero);padding:26mm $SIDEmm 20mm;
   position:relative;display:flex;flex-direction:column;justify-content:space-between}
@@ -358,6 +366,10 @@ class PdfRenderer:
         out_dir = Path(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         title = f"{self.p.config['product']['name']} {self.p.title()}"
+        # Computed here rather than left as a token: _css() has already done its
+        # substitution by the time this string is built, so a $TOKEN written
+        # below would reach the browser as the literal text "$SHEETHmm".
+        sheet = _mm(Typography.load(getattr(self.p, "root", ".")).page.height_mm)
         page = (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
                 f'<title>{_esc(title)}</title><style>{self._css()}'
                 # front matter prints at zero page margin so the cover bleeds
@@ -365,7 +377,7 @@ class PdfRenderer:
                 f'@page{{margin:0}}'
                 # Full sheet, and the band bleeds to the paper edge because
                 # the front matter prints at zero page margin.
-                f'.cover{{height:297mm;padding:0;page-break-after:always}}'
+                f'.cover{{height:{sheet}mm;padding:0;page-break-after:always}}'
                 f'.toc,.revisions{{padding:15mm 18mm;page-break-after:auto}}'
                 f'</style></head>'
                 f'<body><main>{self._cover()}{self._toc()}{self._revisions()}'

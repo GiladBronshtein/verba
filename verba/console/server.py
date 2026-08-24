@@ -903,7 +903,11 @@ class Handler(BaseHTTPRequestHandler):
                 cur = Theme.load(st.root)
                 return self.json({
                     "current": cur.name, "label": cur.label,
-                    "themes": table(self.root),
+                    # st, not self. The handler has no root, so this raised an
+                    # AttributeError, the front end swallowed the 500, and the
+                    # Design page silently offered no palette at all. It is the
+                    # one page for making a document look like yours.
+                    "themes": table(st.root),
                 })
 
             if path == "/api/assistant":

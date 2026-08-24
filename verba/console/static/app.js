@@ -2412,7 +2412,14 @@ async function drawLayout(m) {
 async function drawThemes(m) {
   let d;
   try { d = await api('/api/theme'); }
-  catch (e) { return; }
+  catch (e) {
+    // Returning quietly here is how the palette picker went missing. The
+    // endpoint raised a 500 for one wrong receiver, this swallowed it, and the
+    // Design page simply had no colours on it, with nothing anywhere saying so.
+    m.append(el('div', 'panel', `<div class="empty">The palette could not be ` +
+      `read: ${esc(e.message)}</div>`));
+    return;
+  }
 
   m.append(el('div', 'muted',
     'The palette the document prints in. Every one of these is measured rather ' +

@@ -117,7 +117,8 @@ class Healer:
             f"{json.dumps(snap, indent=1)[:6000]}\n\n"
             f"Give the replacement selector."
         )
-        result = run_model(prompt, system=SYSTEM, timeout=90, log=None)
+        result = run_model(prompt, system=SYSTEM, timeout=90, log=None,
+                             task="repair a selector")
         if not result.ok:
             return {"possible": False, "reasoning": result.error}
         text = (result.output or "").strip()

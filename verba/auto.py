@@ -843,7 +843,8 @@ class Auto:
                         if sec.id in (f.section or "")
                         and not _is_a_persons_signature(f)]
             prompt = assist.build_prompt("review", proj, sec, inv, [], findings, "")
-            res = assist.run_model(prompt, log=None)
+            res = assist.run_model(prompt, log=None, root=self.root,
+                                   task="read against the evidence")
             if not res.ok:
                 self._describe_blocked = (res.error or "")[:120]
                 break
@@ -860,7 +861,8 @@ class Auto:
             before = sec.path.read_text(encoding="utf-8")
             fix = assist.build_prompt("reconcile", proj, sec, inv, [], findings,
                                       "A review of this section found:\n" + report)
-            out = assist.run_model(fix, log=None)
+            out = assist.run_model(fix, log=None, root=self.root,
+                                   task="apply the differences")
             if not out.ok:
                 continue
             proposed = assist.clean_output(out.output)

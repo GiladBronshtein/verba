@@ -200,7 +200,7 @@ Rules:
 """
 
 
-def _ask_for_descriptions(sec, node, wanted, inv, notes, emit) -> dict:
+def _ask_for_descriptions(sec, node, wanted, inv, notes, emit, root=".") -> dict:
     import json as _json
 
     from .console import assist
@@ -212,7 +212,7 @@ def _ask_for_descriptions(sec, node, wanted, inv, notes, emit) -> dict:
         evidence=evidence,
         notes=f"\n{notes}\n" if notes else "")
 
-    result = assist.run_model(prompt, timeout=240)
+    result = assist.run_model(prompt, timeout=240, root=root, task="fill the gaps")
     if not result.ok:
         emit(f"    the writer could not be reached: {(result.error or '')[:80]}")
         return {}
@@ -604,7 +604,7 @@ class Sweep:
         answers, declined = ({}, [])
         if wanted:
             answers, declined = _ask_for_descriptions(
-                sec, node, wanted, inv, notes, emit)
+                sec, node, wanted, inv, notes, emit, root=self.root)
         declined = list(dict.fromkeys(junk + declined))
         if not answers and not declined:
             self.skipped.append(f"{sec.id}: the writer answered none of "
