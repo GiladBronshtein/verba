@@ -42,6 +42,47 @@ AUTH_ABOUT = {
 }
 
 
+def _security_quote(value: str) -> str:
+    """Quote one argument for `security -i`, which parses its own command line."""
+    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def keychain_store(service: str, account: str, password: str):
+    """Save a password in the login keychain without putting it on a command line.
+
+    `security add-generic-password -w <password>` hands a live credential to
+    argv, where every account on the machine can read it out of `ps` for as
+    long as the command runs. The tool's own usage text says the option is
+    insecure.
+
+    Piping the password into a bare `-w` is the obvious replacement and is
+    wrong: that prompt is read with readpassphrase, which opens /dev/tty
+    whenever there is one, so under a real terminal the child ignores the pipe
+    and sits there forever waiting for somebody to type. `security -i` takes
+    the whole command on standard input instead, which keeps the password out
+    of argv on both paths, with a terminal and without one.
+    """
+    if "\n" in password or "\r" in password:
+        raise RuntimeError(
+            "the keychain entry is written one line at a time, so a password "
+            "cannot contain a line break. Change the password, or put it in "
+            "VERBA_PASSWORD for this run instead.")
+    line = " ".join([
+        "add-generic-password", "-U",
+        "-s", _security_quote(service),
+        "-a", _security_quote(account),
+        "-w", _security_quote(password)]) + "\n"
+    r = subprocess.run(["security", "-i"], input=line,
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        # `security -i` adds its own "<command>: returned N" trailer. That is
+        # bookkeeping, not something a person can act on.
+        detail = [ln.strip() for ln in r.stderr.splitlines()
+                  if ln.strip() and not ln.strip().endswith(
+                      f"returned {r.returncode}")]
+        raise RuntimeError(detail[0] if detail else "the keychain refused the entry")
+
+
 @dataclass
 class Environment:
     id: str
@@ -131,11 +172,7 @@ class Environment:
             subprocess.run(["security", "delete-generic-password",
                             "-s", self.keychain_service, "-a", self.user],
                            capture_output=True)
-        r = subprocess.run(
-            ["security", "add-generic-password", "-U", "-s", self.keychain_service,
-             "-a", user, "-w", password], capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(r.stderr.strip() or "the keychain refused the entry")
+        keychain_store(self.keychain_service, user, password)
         self.user = user
 
     def stray_accounts(self) -> list[str]:

@@ -87,6 +87,44 @@ def _image_size(path):
         return None
 
 
+@lru_cache(maxsize=512)
+def _picture_fault(path: str, size: int, mtime: float) -> str:
+    """Why this file cannot be drawn, in plain words, or nothing if it can.
+
+    Existence was the only question asked of an asset, so a zero-byte or half
+    written PNG passed the rules clean and then stopped the DOCX render with a
+    PIL error naming an absolute path and no section, which tells a writer
+    nothing about which figure to go and look at. Reading the file is the only
+    way to know it is a picture: a capture killed part way through leaves a
+    valid header on top of nothing, so opening it is not enough either.
+
+    Keyed on size and time as well as name, so a recapture is read again
+    instead of being answered out of the cache.
+    """
+    if size == 0:
+        return "the file is empty, so whatever wrote it wrote nothing"
+    from PIL import Image, UnidentifiedImageError
+    try:
+        with Image.open(path) as im:
+            im.load()
+    except UnidentifiedImageError:
+        return "the file is not a picture in any format the renderer knows"
+    except OSError as e:
+        return f"the picture stops part way through: {e}"
+    except Exception as e:
+        return f"the picture could not be read: {type(e).__name__}"
+    return ""
+
+
+def _unreadable(path) -> str:
+    p = Path(path)
+    try:
+        st = p.stat()
+    except OSError:
+        return "the file is not there"
+    return _picture_fault(str(p), st.st_size, st.st_mtime)
+
+
 def _is_blank(path) -> bool:
     """A capture that came back as one flat colour."""
     try:
@@ -167,8 +205,26 @@ REMEDIES = {
     "CONTENT-02": ("Ask the writer to fill these in",
                    "sweep", "It writes what the crawl can answer and offers to "
                             "remove anything that was never a control."),
-    "ASSET-01":   ("Recapture this screen", "capture",
-                   "The image the section refers to is not in the library."),
+    # It used to say "Recapture this screen", and that is not how a picture
+    # reaches the document. A capture writes into capture/<run>/screenshots and
+    # stops there; adopting is a separate, deliberate step, and the one thing
+    # that skips a missing file is the sweep, which only compares pictures the
+    # document already has. So the button ran a crawl, the finding stayed, and
+    # the advice was the reason it stayed.
+    "ASSET-01":   ("Show it in Images", "images",
+                   "The section shows a picture the library does not have. "
+                   "Capturing the screen puts the file in the capture folder "
+                   "and no further, so take it up from the Images page, which "
+                   "lists every picture a capture produced that the document "
+                   "has not adopted. If no screen produces this name, the "
+                   "section is pointing at a file that is not coming back, and "
+                   "the section is what has to change."),
+    "ASSET-13":   ("Show it in Images", "images",
+                   "The file is there but it is not a picture: a capture that "
+                   "was interrupted leaves an empty or half written file, which "
+                   "used to pass the rules and stop the build instead. Adopt "
+                   "the picture again from the Images page, or take the figure "
+                   "out of the section."),
     "ASSET-05":   ("Show it in Images", "images",
                    "Nothing in the document uses this picture. Put it in a "
                    "section or delete it."),
@@ -348,6 +404,29 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                         f"a control name",
                         "; ".join(wrong[:4])))
 
+        # A fields, actions, columns, tabs or terms block is a list of entries,
+        # and anything else in that fence parses as valid YAML, lints clean and
+        # then stops the renderer, which walks the block asking each entry for
+        # its name and gets a bare string, or nothing at all. The loader puts
+        # back a missing dash on a single entry because that one is unambiguous;
+        # what reaches here is a shape nobody can guess at, and a build that
+        # dies in the renderer says only which Python call failed.
+        misshapen = []
+        for b in sec.blocks:
+            if b.kind not in LABEL_KEY:
+                continue
+            if not isinstance(b.items, list):
+                misshapen.append(f"the whole {b.kind} block is one value, not a list")
+                continue
+            for it in b.items:
+                if not isinstance(it, dict):
+                    what = "an empty line" if it is None else repr(str(it)[:40])
+                    misshapen.append(f"{b.kind}: {what} has no name and description")
+        if misshapen:
+            add(Finding("CONTENT-05", ERROR, sid,
+                        f"{len(misshapen)} table entry(ies) the renderer cannot draw",
+                        "; ".join(misshapen[:4])))
+
         # A specific value where the feature belongs. "Back to Test Publisher 11"
         # describes one row of one account; the reader has a different one. The
         # masking map knows every value the crawler substituted, so anything
@@ -504,6 +583,14 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                 used.setdefault(name, []).append(sid)
                 if not project.assets.exists(name):
                     add(Finding("ASSET-01", ERROR, sid, f"missing asset file: {name}"))
+                    continue
+                # Present is not the same as usable, and only one of the two was
+                # ever checked here.
+                fault = _unreadable(project.asset_path(name))
+                if fault:
+                    add(Finding("ASSET-13", ERROR, sid,
+                                f"asset file cannot be opened as a picture: {name}",
+                                fault))
             if b.kind == "screenshot":
                 # A figure is a picture of a screen. When the file behind one is
                 # a cropped control a few dozen pixels tall, the page prints a

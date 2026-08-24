@@ -196,8 +196,24 @@ _ICON_RE = re.compile(r"^([\U0001F300-\U0001FAFF☀-➿️←-⇿]+)\s+(.*)$")
 _BARE_COLON = re.compile(r'^(\s*(?:-\s+)?[A-Za-z_][\w-]*:)\s+(?![\'"|>&*!])(.*\S)\s*$')
 
 
+def _entries(data):
+    """A block's items in the shape every renderer walks: a list of entries.
+
+    One entry written without its leading dash is a plain mapping, which is
+    valid YAML, so nothing objected: it parsed, it linted, and then the
+    renderer asked each entry for its keys and got the keys of the only entry
+    instead of the entry itself. That is the most ordinary way there is to
+    write one of these blocks wrongly, and the writer's meaning is not in
+    doubt, so it is wrapped rather than refused.
+
+    Any other shape is left exactly as it was found. Guessing at it would put
+    words in the writer's mouth, and CONTENT-05 reports it instead.
+    """
+    return [data] if isinstance(data, dict) else data
+
+
 def _load_block(text: str):
-    """Parse a fenced YAML block, repairing the one mistake that keeps happening.
+    """Parse a fenced YAML block, repairing the mistakes that keep happening.
 
     A value containing a colon and a space must be quoted. Writers get this
     wrong, and so does a language model asked to emit `TODO: describe this.`
@@ -205,7 +221,7 @@ def _load_block(text: str):
     it, then parse.
     """
     try:
-        return yaml.safe_load(text) or []
+        return _entries(yaml.safe_load(text) or [])
     except yaml.YAMLError:
         pass
 
@@ -218,7 +234,7 @@ def _load_block(text: str):
         else:
             repaired.append(line)
     try:
-        return yaml.safe_load("\n".join(repaired)) or []
+        return _entries(yaml.safe_load("\n".join(repaired)) or [])
     except yaml.YAMLError as e:
         raise ValueError(f"this block is not valid YAML: {e}") from e
 

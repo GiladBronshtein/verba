@@ -26,6 +26,39 @@ from ..theme import THEME, Theme
 
 ICON_MARKER = re.compile(r"\[icon:([^\]\s]+)(?:\s+=([\d.]+)cm)?\]")
 
+# One millimetre in twips, which is what Word measures a tab stop in.
+TWIPS_PER_MM = 56.6929
+
+
+def logo_path(project) -> Path | None:
+    """The company's mark for the cover, or None if this document names none.
+
+    Set as ``document.logo`` in content/doc.yaml, a path relative to the project
+    root so what a person types is what they see in their own folder. The asset
+    store is tried as well, because that is where everything else a document
+    draws already lives.
+
+    A mark that is named but not on disk is left out rather than fatal. A cover
+    without a logo still prints, and stopping a release over one file helps
+    nobody; `verba lint` is where a person should be told.
+
+    It lives in this module because the other two renderers already import from
+    here, so all three reach it without a circular import.
+    """
+    name = str((project.config.get("document") or {}).get("logo") or "").strip()
+    if not name:
+        return None
+    candidate = Path(name)
+    if not candidate.is_absolute():
+        candidate = Path(getattr(project, "root", ".")) / candidate
+    if candidate.exists():
+        return candidate
+    try:
+        in_assets = project.asset_path(name)
+    except Exception:
+        return None
+    return in_assets if in_assets.exists() else None
+
 
 def C(h: str) -> RGBColor:
     return RGBColor.from_string(h)
@@ -385,15 +418,19 @@ class DocxRenderer:
     def cover(self):
         cfg, prod = self.p.config, self.p.config["product"]
         doc_cfg = cfg.get("document", {})
-        rows = [
+        # A label with nothing beside it reads as a field that failed to fill,
+        # not as a fact that does not apply. The PDF cover has always dropped
+        # these; this one printed "Environment:" against blank space.
+        rows = [(k, v) for k, v in (
             ("Environment", doc_cfg.get("environment", "")),
             ("Platform", prod.get("platform_version", "")),
             ("Edition", self.p.profile.name.title()),
             ("Revision", cfg.get("_release_label", "draft")),
-        ]
+        ) if str(v).strip()]
         tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        _render_cover(tmp.name, prod.get("vendor", "RISE"), prod.get("name", ""),
-                      self.p.title(), rows, doc_cfg.get("confidentiality", ""))
+        _render_cover(tmp.name, prod.get("vendor", ""), prod.get("name", ""),
+                      self.p.title(), rows, doc_cfg.get("confidentiality", ""),
+                      theme=self.t, logo=logo_path(self.p))
         tmp.close()
         self._tmp.append(tmp.name)
         p = self.doc.add_paragraph()
@@ -516,28 +553,97 @@ def _rfonts(style, family: str, fallback: str | None = None):
 
 # ── cover art ────────────────────────────────────────────────────────────────
 
-_FONT_BOLD = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
-_FONT_REG = "/System/Library/Fonts/Supplemental/Arial.ttf"
+# Tried in order, and Pillow's own DejaVu is last because it ships with the
+# package and therefore always exists. Two absolute macOS paths were the whole
+# list, so on Linux and Windows every string on this cover fell back to
+# Pillow's default bitmap face and the page came out effectively blank. The
+# package is published for everybody.
+_BOLD_FACES = ("/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+               "C:/Windows/Fonts/arialbd.ttf",
+               "DejaVuSans-Bold.ttf")
+_REG_FACES = ("/System/Library/Fonts/Supplemental/Arial.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+              "C:/Windows/Fonts/arial.ttf",
+              "DejaVuSans.ttf")
+_FONT_BOLD = _BOLD_FACES
+_FONT_REG = _REG_FACES
 
 
-def _font(path, size):
-    try:
-        return ImageFont.truetype(path, size)
-    except Exception:
-        return ImageFont.load_default()
+def _font(faces, size):
+    """The first of these that this machine actually has."""
+    for face in (faces if isinstance(faces, (tuple, list)) else [faces]):
+        try:
+            return ImageFont.truetype(face, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _fits(draw, text, faces, start, width):
+    """The largest size at which this string fits, down to a floor.
+
+    The vendor size was tuned for the four letters of RISE and nothing measured
+    the string, so any company with a longer name had it cut off at the edge of
+    its own cover.
+    """
+    size = start
+    while size > 28:
+        font = _font(faces, size)
+        box = draw.textbbox((0, 0), text, font=font)
+        if box[2] - box[0] <= width:
+            return font
+        size -= 4
+    return _font(faces, 28)
+
+
+def _rgb(value, fallback):
+    """A theme token as an (r, g, b) triple."""
+    v = str(value or "").strip().lstrip("#")
+    if len(v) == 6:
+        try:
+            return tuple(int(v[i:i + 2], 16) for i in (0, 2, 4))
+        except ValueError:
+            pass
+    return fallback
 
 
 def _render_cover(out, vendor, product, subtitle, rows, confidentiality,
-                  W=1240, H=1876):
-    navy, blue, lav = (27, 37, 73), (49, 55, 219), (235, 239, 252)
+                  W=1240, H=1876, theme=None, logo=None):
+    # The palette is the document's, not this file's. These five literals meant
+    # that whichever theme a person chose, and whatever palette they authored,
+    # the DOCX cover came out in one company's indigo while the body of the
+    # same file followed their colours.
+    theme = theme or THEME
+    navy = _rgb(getattr(theme, "navy_deep", None), (27, 37, 73))
+    blue = _rgb(getattr(theme, "brand_blue", None), (49, 55, 219))
+    lav = _rgb(getattr(theme, "lavender", None), (235, 239, 252))
     grey, greydk = (161, 161, 161), (100, 100, 110)
     img = Image.new("RGB", (W, H), (255, 255, 255))
     d = ImageDraw.Draw(img)
     d.rectangle([(0, 0), (W, 30)], fill=blue)
-    d.text((80, 440), vendor.upper(), font=_font(_FONT_BOLD, 130), fill=navy)
-    d.rectangle([(80, 610), (W - 80, 614)], fill=blue)
-    d.text((82, 632), product, font=_font(_FONT_REG, 66), fill=navy)
-    d.text((84, 726), subtitle, font=_font(_FONT_REG, 27), fill=blue)
+
+    top = 440
+    if logo is not None:
+        try:
+            mark = Image.open(logo).convert("RGBA")
+            wide = 320
+            mark.thumbnail((wide, 200))
+            img.paste(mark, (80, 250), mark)
+            top = 250 + mark.height + 60
+        except Exception:
+            # A mark that cannot be opened is left out. A cover without a logo
+            # still prints, and failing a release over one file helps nobody.
+            pass
+
+    d.text((80, top), vendor.upper(),
+           font=_fits(d, vendor.upper(), _FONT_BOLD, 130, W - 160), fill=navy)
+    rule = top + 170
+    d.rectangle([(80, rule), (W - 80, rule + 4)], fill=blue)
+    d.text((82, rule + 22),
+           product, font=_fits(d, product, _FONT_REG, 66, W - 164), fill=navy)
+    d.text((84, rule + 116), subtitle,
+           font=_fits(d, subtitle, _FONT_REG, 27, W - 168), fill=blue)
     y1, y2 = 950, 950 + 40 + len(rows) * 54
     d.rounded_rectangle([(80, y1), (W - 80, y2)], radius=10, fill=lav)
     d.rectangle([(80, y1), (85, y2)], fill=blue)

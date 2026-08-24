@@ -689,18 +689,29 @@ def cmd_new(args):
     given = {k: v for k, v in given.items() if v}
 
     if not args.yes and not given.get("product"):
+        # A flag is an answer. The wizard used to ask every question regardless
+        # and write its own answer over the top, so --theme, --url, --vendor and
+        # the rest were accepted, advertised in --help, and then thrown away.
+        def answered(key, prompt, default="", options=None):
+            if given.get(key):
+                print(f"{prompt} {given[key]}   (given on the command line)")
+                return given[key]
+            return _ask(prompt, default, options)
+
         print("\nA few questions, then you will have a document that builds.")
         print("Press Return to take the default on any of them.\n")
-        given["product"] = _ask("What is the product called?", "My Product")
-        given["vendor"] = _ask("Who makes it?", given["product"])
-        given["about"] = _ask("What does it do, in one sentence?", "")
-        given["base_url"] = _ask("Where does it live?", "https://example.com")
-        given["auth"] = _ask("How do you sign in?", "form", AUTH_KINDS)
+        given["product"] = answered("product", "What is the product called?",
+                                    "My Product")
+        given["vendor"] = answered("vendor", "Who makes it?", given["product"])
+        given["about"] = answered("about", "What does it do, in one sentence?")
+        given["base_url"] = answered("base_url", "Where does it live?",
+                                     "https://example.com")
+        given["auth"] = answered("auth", "How do you sign in?", "form", AUTH_KINDS)
         if given["auth"] in ("form", "handoff"):
-            given["user"] = _ask("Which account will the crawl use?", "")
+            given["user"] = answered("user", "Which account will the crawl use?")
         looks = {n: Theme.named(n).about.strip().split(".")[0] + "."
                  for n in themes_available()}
-        given["theme"] = _ask("Which look?", "slate", looks)
+        given["theme"] = answered("theme", "Which look?", "slate", looks)
 
     try:
         answers = Answers(**given)
@@ -1007,7 +1018,15 @@ def cmd_fonts(args):
     if args.document or args.console:
         for which, key in (("document", args.document), ("console", args.console)):
             if key:
-                t.choose(which, key)
+                # choose() already words the refusal, naming every face the
+                # registry holds. Letting it out as an exception turned a
+                # mistyped name into "this could not run", which reads as a
+                # broken tool rather than a typo.
+                try:
+                    t.choose(which, key)
+                except ValueError as e:
+                    print(f"refused: {e}")
+                    return 1
                 print(f"{which} is now set in {t.faces[key].label}")
         print("\nrebuild to see it: python3 -m verba build --pdf")
         return 0
@@ -1024,12 +1043,18 @@ def cmd_fonts(args):
 
     print(f"document: {t.face('document').label}     console: {t.face('console').label}\n")
     print(f"{'':3}{'KEY':14} {'TYPEFACE':18} {'FIRST FAMILY':24} WHERE")
-    for r in t.table():
+    faces = t.table()
+    for r in faces:
         mark = ("D" if r["is_document"] else " ") + ("C" if r["is_console"] else " ")
         state = "webfont" if r["webfont"] else ("installed" if r["available"] else "MISSING")
         print(f"{mark:3}{r['key']:14} {r['label']:18} {r['primary']:24} {state}")
     print("\n  D = the document is set in it, C = the console is")
-    print("\nchange it with:  python3 -m verba fonts --document google-sans")
+    # The example used to be a face called google-sans, which is in no registry
+    # this ships. Following the tool's own instruction failed. The example is
+    # now read off the table above, so it is always a name that works.
+    other = next((r["key"] for r in faces if not r["is_document"]), "")
+    if other:
+        print(f"\nchange it with:  python3 -m verba fonts --document {other}")
     print("prove it with:   python3 -m verba fonts --verify")
     return 0
 
@@ -1067,11 +1092,20 @@ def cmd_section(args):
         d = Path(args.root) / "content" / "sections" / chapter
         d.mkdir(parents=True, exist_ok=True)
         n = len(list(d.glob("*.md"))) + 1
+        # Not `TODO: describe this`, which is the one marker CONTENT-02 refuses
+        # to ship. The first section a person adds by hand used to carry it, so
+        # their next build failed on a rule they had not read yet. This is
+        # honest placeholder prose instead: true before anything is written,
+        # and replaced the moment there is a capture to write from.
         sec = Section(id=sid, title=title, meta={
             "id": sid, "title": title, "status": "draft",
             "last_verified": "", "screens": [args.screen] if args.screen else [],
             "sources": [],
-        }, blocks=[Block("paragraph", "TODO: describe this screen.")])
+        }, blocks=[Block("paragraph",
+                         f"This section describes {title} in "
+                         "{{ product.name }} and the work it is used for. "
+                         "Replace this paragraph with what an operator does "
+                         "here, in the words the product itself uses.")])
         path = sec.save(d / f"{n:03d}-{sid.split('.')[-1]}.md")
         print(f"created {path}")
         print("add it to content/doc.yaml under the right parent so it ships.")
@@ -1289,8 +1323,27 @@ def cmd_history(args):
 
 
 def cmd_selftest(args):
+    """Run the engine's own suite, which lives with the engine and not with the document.
+
+    This used to look only under the document root, where tools/ has no reason
+    to be, and the package does not ship tools/ at all. So the command could
+    never work: from a document it named a file that was not there, and from an
+    install there was nothing to name. It looks beside the package first, which
+    is where a source checkout keeps it, and says what to run instead when the
+    suite is genuinely not on this machine.
+    """
     import subprocess
-    script = Path(args.root) / "tools" / "selftest.py"
+    beside = Path(__file__).resolve().parent.parent / "tools" / "selftest.py"
+    script = next((p for p in (beside, Path(args.root) / "tools" / "selftest.py")
+                   if p.exists()), None)
+    if script is None:
+        print("the self-test belongs to the engine's source, and it is not part "
+              "of the installed package, so there is nothing here to run.")
+        print("To run it, clone the engine and run it from there:")
+        print("  git clone https://github.com/GiladBronshtein/verba")
+        print("  cd verba && python3 tools/selftest.py")
+        print("To check this document instead: python3 -m verba lint")
+        return 1
     cmd = [sys.executable, str(script)] + (["--live"] if args.live else [])
     return subprocess.run(cmd).returncode
 

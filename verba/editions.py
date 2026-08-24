@@ -23,15 +23,28 @@ whatever an edition file says.
 """
 from __future__ import annotations
 
+from difflib import get_close_matches
 from pathlib import Path
 
 import yaml
 
-from .model import _entry
+from .model import _entry, outline_ids
 
 
 def _path(root: Path | str, profile: str) -> Path:
     return Path(root) / "content" / "profiles" / f"{profile}.yaml"
+
+
+def known_ids(root: Path | str) -> list[str]:
+    """Every section the outline names, in the order it names them.
+
+    The outline rather than the built tree, because both directions need this:
+    ``drop`` names something the edition currently carries and ``add`` names
+    something it does not, and the built tree only holds the first kind.
+    """
+    path = Path(root) / "content" / "doc.yaml"
+    cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return outline_ids(cfg.get("outline") or [])
 
 
 def read(project) -> list[dict]:
@@ -97,6 +110,19 @@ def carry(root: Path | str, profile: str, section_id: str, carried: bool) -> str
     path = _path(root, profile)
     if not path.exists():
         raise ValueError(f"no such edition: {profile}")
+
+    # The edition file was checked and the section id was not, so a mistyped id
+    # was written into `exclude:`, reported as done, and excluded nothing. The
+    # edition then shipped the section the person had just been told it would
+    # not, which is the worst way for a setting to fail.
+    known = known_ids(root)
+    if section_id not in known:
+        near = get_close_matches(section_id, known, n=1, cutoff=0.6)
+        raise ValueError(
+            f"content/doc.yaml has no section called {section_id}."
+            + (f" Did you mean {near[0]}?" if near else "")
+            + " Run 'verba edition' to see every section an edition can carry.")
+
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     picks = dict(data.get("sections") or {})
     include = picks.get("include")

@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -85,6 +87,35 @@ class Library:
         return None, d
 
 
+def _read_registry(path: Path) -> tuple[dict, str]:
+    """The registry, and in plain words whatever stopped it being read.
+
+    The registry says where each picture came from. It is provenance, not
+    content: without it every picture is still on disk and the document still
+    builds. But it was read inside Project.load, so a file left half written by
+    a killed capture stopped every command in the tool, including `status` and
+    `lint`, whose entire job is to tell somebody what state the document is in.
+    Refusing to say anything at all is the least useful moment to refuse.
+    """
+    if not path.exists():
+        return {}, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
+        # A fault we recovered from still had a cause, and VERBA_TRACEBACK is
+        # the one switch this tool tells people to reach for when they want the
+        # cause. Swallowing it here would make that switch lie.
+        if os.environ.get("VERBA_TRACEBACK"):
+            traceback.print_exc()
+        if isinstance(e, json.JSONDecodeError):
+            return {}, f"{path.name} is not valid JSON: {e.msg} at line {e.lineno}"
+        return {}, f"{path.name} could not be read: {e}"
+    if not isinstance(data, dict):
+        return {}, (f"{path.name} holds a {type(data).__name__} where a set of "
+                    f"named entries belongs")
+    return data, ""
+
+
 @dataclass
 class AssetStore:
     """Where the content tree keeps its images."""
@@ -95,8 +126,14 @@ class AssetStore:
         (self.root / "screenshots").mkdir(parents=True, exist_ok=True)
         (self.root / "icons").mkdir(parents=True, exist_ok=True)
         self.registry_path = self.root / "registry.json"
-        self.registry = json.loads(self.registry_path.read_text()) \
-            if self.registry_path.exists() else {}
+        self.registry, self.registry_error = _read_registry(self.registry_path)
+        if self.registry_error:
+            print(f"the asset registry could not be read: {self.registry_error}.\n"
+                  f"Carrying on without it. Every picture is still there and the "
+                  f"document still builds; what is missing is the record of where "
+                  f"each one came from, so rules that ask that question will say "
+                  f"they do not know. The next thing that stores a picture keeps "
+                  f"the unreadable file beside the new one.")
 
     def path_for(self, name: str) -> Path:
         sub = "icons" if name.startswith("icon-") else "screenshots"
@@ -113,6 +150,16 @@ class AssetStore:
         return name
 
     def save(self):
+        # A registry nothing could parse is still the only copy of what it
+        # held, and a person reading it can often see what a parser cannot.
+        # Writing straight over it would trade that for a file holding one
+        # entry and no history, so it is kept beside the new one instead.
+        if getattr(self, "registry_error", "") and self.registry_path.exists():
+            spare = self.registry_path.with_suffix(".json.unreadable")
+            self.registry_path.replace(spare)
+            print(f"the unreadable asset registry was kept as {spare.name}, and a "
+                  f"new one written in its place. Delete it once you have looked.")
+            self.registry_error = ""
         write_json(self.registry_path, self.registry, sort_keys=True)
 
     def exists(self, name: str) -> bool:

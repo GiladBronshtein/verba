@@ -109,6 +109,10 @@ nav,.meta,.driftbox{display:none !important}
   height:2.2mm;background:var(--blue)}
 .cover .vendor{font-size:9pt;letter-spacing:0.26em;text-transform:uppercase;
   color:var(--peri);font-weight:600}
+/* The company's own mark, if this document names one. Capped rather than
+   scaled to a width, because a logo is whatever shape it is and forcing one
+   into a box is how a wordmark ends up squashed. */
+.cover .logo{max-width:52mm;max-height:16mm;margin:0 0 auto;object-fit:contain}
 .cover .titles{margin-bottom:2mm}
 .cover .product{font-size:42pt;line-height:1.02;letter-spacing:-0.028em;
   font-weight:700;color:#fff;max-width:150mm;margin:0}
@@ -302,8 +306,15 @@ class PdfRenderer:
         eyebrow = vendor.strip() if vendor.strip() and vendor.strip() != name.strip() else ""
         lead = _esc(doc.get("lead", "")) if doc.get("lead") else ""
         conf = _esc(doc.get("confidentiality", ""))
+        # The same mark as the DOCX, read the same way, so the two deliverables
+        # of one release cannot disagree about whose document this is.
+        from .docx import logo_path
+        mark = logo_path(self.p)
+        badge = (f'<img class="logo" src="{_esc(mark.resolve().as_uri())}" alt="">'
+                 if mark else "")
         return (f'<div class="cover">'
                 f'<div class="band">'
+                f'{badge}'
                 f'<div class="vendor">{_esc(eyebrow)}</div>'
                 f'<div class="titles">'
                 f'<div class="product">{_esc(name)}</div>'

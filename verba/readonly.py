@@ -21,6 +21,32 @@ from dataclasses import dataclass, field
 
 READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
+# A read method is not proof of a read. /logout is a GET in most products, and
+# so is a link that archives a row, revokes a key or removes a member. Treating
+# the verb as the whole test was the last way through this guard.
+#
+# Matched against the path in segments, never anywhere in the address: a query
+# string or a file name that happens to mention one of these words is not an
+# action, and an icon called archive-arrow.svg must still load. A word only
+# counts where a path segment starts with it and something ends it, so
+# /users/7/delete-member is caught while /reports/deleted-items is not.
+DESTRUCTIVE_GET = re.compile(
+    r"/(?:log|sign)[-_]?(?:out|off)(?:[-_./?]|$)"
+    r"|/(?:delete|destroy|remove|revoke|archive|purge|deactivate|disable|"
+    r"unpublish|impersonate|duplicate|toggle)(?:[-_./?]|$)", re.I)
+
+# Nothing here can carry an action, and blocking one would break a screenshot
+# for no gain. Anything else, including a request with no type at all, is
+# checked.
+ASSET_TYPES = {"image", "media", "font", "stylesheet", "script", "manifest",
+               "texttrack", "eventsource"}
+
+# How many permitted sign-in requests are written out in full. The record of
+# the one permitted window is what makes the exception auditable, so it is kept
+# whole; this only stops a page that reloads in a loop from growing the
+# manifest without bound, and the true count is reported next to it regardless.
+AUDIT_LIMIT = 2000
+
 # Step verbs that can only ever read.
 SAFE_STEPS = {"goto", "click", "click_text", "wait_for", "wait_ms", "press",
               "scroll", "expand_all", "hover", "mask"}
