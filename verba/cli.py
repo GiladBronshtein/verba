@@ -1192,7 +1192,10 @@ def cmd_accept(args):
         print(f"[{i}/{len(cards)}]  {card.number}  {card.title}")
         print(f"       {card.id}  ({card.words} words, "
               f"{len(card.figures)} figure(s), status {card.status})")
-        if card.last:
+        if card.checked_by_loop:
+            print("       the loop read this against the crawl and found "
+                  "nothing outstanding")
+        elif card.last:
             print(f"       last stamped {card.last}, by nobody")
         diffs = card.differences()
         if diffs:

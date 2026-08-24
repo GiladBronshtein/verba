@@ -13,7 +13,7 @@ from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from .attest import is_attested
+from .attest import is_attested, signed_by_a_person
 from .model import LABEL_KEY
 
 ERROR, WARN, INFO = "error", "warning", "info"
@@ -262,6 +262,11 @@ REMEDIES = {
                    "The capture came back blank."),
     "FRESH-01":   ("Mark verified", "verify", "Nobody has checked this against "
                                               "the live product."),
+    "FRESH-05":   ("Read them yourself", "accept",
+                   "The loop read these against the crawl and found nothing "
+                   "outstanding, and the document records that it was the loop "
+                   "and not a person. Nothing is wrong with them. Reading one "
+                   "yourself replaces its signature with yours."),
     "FRESH-04":   ("Read and sign them", "accept",
                    "These sections were marked verified before signatures were "
                    "recorded, so the badge does not say who checked them or "
@@ -344,6 +349,7 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
     tenant_terms = project.tenant_terms()
     findings: list[Finding] = []
     unsigned: list[str] = []
+    machine_read: list[str] = []
 
     # Design decisions are held to the same standard as content rules. A
     # decision that only lives in a document is a note; one that fails a build
@@ -545,6 +551,8 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
         # where the date came from.
         if sec.status == "verified" and not is_attested(sec.meta):
             unsigned.append(sid)
+        elif sec.status == "verified" and not signed_by_a_person(sec.meta):
+            machine_read.append(sid)
         if not lv:
             add(Finding("FRESH-01", WARN, sid, "no last_verified date"))
         else:
@@ -587,6 +595,17 @@ def lint(project, strict_staleness_days: int = 120) -> list[Finding]:
                         f"the document is rendering in {theme.name} instead"))
     except Exception:
         pass
+
+    # Not a defect, and reported so a person can still find what no person has
+    # read. The loop checking a section against the crawl is a real check and
+    # the document says so; whether that is enough is the reader's call, and
+    # they can only make it if they can see which is which.
+    if machine_read:
+        add(Finding("FRESH-05", INFO, "",
+                    f"{len(machine_read)} section(s) checked by the loop, not "
+                    f"read by a person",
+                    "Each was read against the crawl and had nothing "
+                    "outstanding. To read them yourself: verba accept."))
 
     # -- assets -----------------------------------------------------------
     used: dict[str, list[str]] = {}

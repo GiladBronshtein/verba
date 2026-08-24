@@ -20,7 +20,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .attest import attest, is_attested, latest_capture, whoami
+from .attest import attest, is_attested, latest_capture, signed_by_a_person, whoami
 
 
 @dataclass
@@ -36,6 +36,7 @@ class Card:
     changed_since: list = field(default_factory=list)
     status: str = ""
     last: str = ""
+    checked_by_loop: bool = False
 
     def differences(self) -> list[str]:
         """Where the section and the crawl disagree, in words."""
@@ -79,7 +80,10 @@ def outstanding(project, root: Path | str) -> list[Card]:
         sec = node.section
         if sec is None or sec.path is None:
             continue
-        if sec.status == "verified" and is_attested(sec.meta):
+        # A section the loop has checked is not outstanding, but a person
+        # reading it themselves still upgrades the signature, so it stays on
+        # the list marked for what it is.
+        if sec.status == "verified" and signed_by_a_person(sec.meta):
             continue
         try:
             text = sec.path.read_text(encoding="utf-8")
@@ -93,6 +97,7 @@ def outstanding(project, root: Path | str) -> list[Card]:
             seen=_evidence(root, sec.screens),
             status=sec.status,
             last=sec.last_verified,
+            checked_by_loop=is_attested(sec.meta),
         ))
     return cards
 

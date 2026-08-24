@@ -35,7 +35,11 @@ MACHINE_ACTORS = {"auto", "assist", "drift", "capture", "system", "sweep",
 # is the text that is there again. Without this, one reverted step stripped the
 # badge off eighteen sections whose content was fully restored, and nothing in
 # the log said so: the count went down and it read as progress.
-RESTORING = {"put back", "restore", "revert", "undo", "baseline"}
+RESTORING = {"put back", "restore", "revert", "undo", "baseline",
+             # Signing is not authoring. An attestation records a check that
+             # was just made against the text as it stands, so demoting on it
+             # would undo the thing being written in the same breath.
+             "accept", "verify"}
 
 
 def whoami() -> str:
@@ -71,13 +75,28 @@ def is_attested(meta: dict) -> bool:
                 and str(meta.get("verified_against", "") or "").strip())
 
 
-def attest(meta: dict, who: str, capture: str, when: str) -> dict:
+# Who did the checking. Both are real checks and the difference is worth
+# recording, so a reader can tell one from the other and a person can look for
+# the sections no person has read. What was never acceptable was a document
+# claiming a check that nobody and nothing had made.
+PERSON, LOOP = "person", "loop"
+
+
+def attest(meta: dict, who: str, capture: str, when: str,
+           kind: str = PERSON) -> dict:
     meta = dict(meta)
     meta["status"] = "verified"
     meta["last_verified"] = when
     meta["verified_by"] = who
     meta["verified_against"] = capture
+    meta["verified_kind"] = kind
     return meta
+
+
+def signed_by_a_person(meta: dict) -> bool:
+    """A person read this one, rather than the loop checking it."""
+    return is_attested(meta) and str(
+        meta.get("verified_kind", PERSON) or PERSON) == PERSON
 
 
 def demote(text: str, actor: str, action: str = "") -> str:

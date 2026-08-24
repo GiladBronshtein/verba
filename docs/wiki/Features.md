@@ -159,6 +159,8 @@ properly.
 | **Light and dark** | Both measured against the surface each colour is actually painted on |
 | **Several documents** | Every system you document, switchable in one console |
 | **History** | Every change ever made, by whom, with a diff and a restore |
+| **The loop signs what it checked** | A signature names its signer, so a check by the loop is recorded as one and a person's is never written over |
+| **Prose is checked too** | A section with no screen is read against your own product description, which is the only thing prose about meaning can contradict |
 | **Verification that costs something** | Accepting a section records who accepted it and which crawl they read it against, and any machine change drops the badge |
 | **An acceptance walk** | `verba accept` shows each unsigned section against its crawl evidence and what the two disagree about, one at a time. An empty answer is a skip, never a yes |
 | **A ceiling on model calls** | Every run has a call limit and keeps a tally by task, written to a ledger, so a loop stuck in a circle stops rather than continuing until an invoice arrives |

@@ -45,6 +45,7 @@ flowchart TD
 | use the pictures the crawl took | Adopts a fresher photograph of a screen a section already shows | no |
 | replace pictures nobody has checked | A picture that no crawl produced cannot be trusted. If a screen can produce it, photograph it | no |
 | look at the pictures nobody has checked | Reads each unchecked image, against the exact list of names that must never appear | yes, with vision |
+| read the sections no crawl can reach | Sections bound to no screen, read against `content/system.md` and corrected where they contradict it | yes |
 | read each section against what the crawl saw | Does what this section says survive contact with the screen, and does it leave out what the screen is for | yes |
 | check each picture is of what its section describes | A chapter called Dashboard Overview illustrated by the accounts list passes every other rule | yes, with vision |
 | decide what nothing else could settle | From a closed menu of three moves, or says plainly that this one is yours | yes |

@@ -29,6 +29,9 @@ from dataclasses import dataclass, field
 
 FIGURE = re.compile(r"^!\[[^\]]*\]\(([^)\s]+)", re.M)
 FENCE = re.compile(r"^```([a-z]+)", re.M)
+# A callout is not a fenced block, so losing every one of them
+# tripped nothing.
+NOTE = re.compile(r"^>\s*\[!", re.M)
 
 # A rewrite may tighten prose. It may not quietly delete half a section: below
 # this share of the words it was given, something has gone wrong rather than
@@ -49,10 +52,16 @@ class Shape:
                 text = sec.path.read_text(encoding="utf-8") if sec.path else ""
             except Exception:
                 continue
+            # The body, not the file. Front matter is a dozen words of keys
+            # that survive anything, so counting the whole file let a section
+            # lose every word it actually said and still look like a thirty
+            # per cent trim. One went to nothing at all and passed.
+            body = text.split("---", 2)[-1] if text.lstrip().startswith("---") else text
             out[sid] = {
                 "figures": set(FIGURE.findall(text)),
                 "blocks": set(FENCE.findall(text)),
-                "words": len(text.split()),
+                "notes": len(NOTE.findall(text)),
+                "words": len(body.split()),
             }
         return cls(sections=out)
 
@@ -86,8 +95,13 @@ def faults(before: Shape, after: Shape) -> dict:
         if dropped:
             note(sid, f"{sid} lost every {', '.join(sorted(dropped))} block")
 
-        if was["words"] and now["words"] < was["words"] * FLOOR:
+        if was["words"] and not now["words"]:
+            note(sid, f"{sid} has no body left at all")
+        elif was["words"] and now["words"] < was["words"] * FLOOR:
             note(sid, f"{sid} went from {was['words']} words to {now['words']}")
+
+        if was.get("notes", 0) > now.get("notes", 0):
+            note(sid, f"{sid} lost {was['notes'] - now['notes']} callout(s)")
 
     return out
 

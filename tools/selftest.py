@@ -1082,18 +1082,29 @@ def t_verified_costs_something():
     ok(demote("---\nstatus: verified\n---\nx", "human") ==
        "---\nstatus: verified\n---\nx",
        "a person's own edit dropped their acceptance")
-    # and the loop must never be able to sign one itself, which is the whole
-    # reason the signature is worth anything
-    from verba.auto import _is_a_persons_signature
-    from verba.lint import WARN, Finding
-    ok(_is_a_persons_signature(Finding("FRESH-04", WARN, "s", "x")),
-       "the decider is allowed to consider marking a section verified")
-    ok(not _is_a_persons_signature(Finding("ASSET-03", WARN, "s", "x")),
-       "an ordinary finding was routed away from the decider")
-    src = (Path(__file__).resolve().parents[1] / "verba" / "auto.py").read_text()
-    ok('"verified"' not in src and "'verified'" not in src,
-       "the loop names the verified status, so it can reach for it")
-    return "a claim carries who and against what, and no machine can sign one"
+    # The loop may sign, and it signs as itself. The fault this rule was written
+    # for was a document claiming thirty-eight human checks that nobody had
+    # made. That is a lie about the signer, not a fact about automation, and
+    # forcing a person into the loop of a system built not to need one fixed
+    # the wrong half of it.
+    from verba.attest import LOOP, signed_by_a_person
+    machine = attest(dict(sec.meta), "the loop (claude-sonnet-5)",
+                     "2026-08-23T000000", "2026-08-23", kind=LOOP)
+    ok(is_attested(machine), "a check the loop made does not count as one")
+    ok(not signed_by_a_person(machine),
+       "a signature by the loop is passing itself off as a person's")
+    ok(signed_by_a_person(attest(dict(sec.meta), "Gilad", "c", "2026-08-23")),
+       "a person's signature is not recorded as one")
+
+    # and it never signs over a person, because they read it themselves
+    import inspect
+
+    from verba.auto import Auto
+    body = inspect.getsource(Auto._sign_off)
+    ok("signed_by_a_person" in body,
+       "the loop would sign over a section a person had already read")
+
+    return "a claim names its signer, and the loop signs as the loop"
 
 
 @check("a step cannot damage what no rule measures")

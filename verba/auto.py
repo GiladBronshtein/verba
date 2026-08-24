@@ -304,6 +304,8 @@ class Auto:
                        self._look_at_pictures, emit)
             self._step("read each section against what the crawl saw",
                        self._review_against_evidence, emit)
+            self._step("read the sections no crawl can reach",
+                       self._read_the_prose, emit)
             self._step("check each picture is of what its section describes",
                        self._check_pictures_match, emit)
             self._step("decide what nothing else could settle",
@@ -586,6 +588,186 @@ class Auto:
 
         return f"{cleared} stray line(s) removed" if cleared else ""
 
+    def _read_the_prose(self, emit) -> str:
+        """Check the sections no crawl can reach, against what the product is.
+
+        Sixteen of the thirty-eight sections in the first real document are
+        bound to no screen: an introduction, a scope, a page of key terms. The
+        crawl has nothing to say about any of them, so the step that reads a
+        section against the evidence skips them, and they could never be
+        settled by anything.
+
+        They are not unverifiable, though. A person wrote down what this
+        product is and what its words mean, in content/system.md, and that is
+        exactly what prose like this can contradict. So it is read against
+        that: not "does this match the screen", which is meaningless here, but
+        "does this contradict what the product's own description says, and does
+        it claim anything the description does not support".
+
+        The signature records what it was read against, so nobody can mistake
+        it for a check against the running system.
+        """
+        from datetime import date as _date
+
+        from .attest import LOOP, attest, signed_by_a_person
+        from .console import assist
+        from .history import History
+        from .system import System
+
+        proj = self._project()
+        ok, why = assist.available()
+        if not ok:
+            self._describe_blocked = why
+            return ""
+        about = System.load(self.root).prompt_block().strip()
+        if not about:
+            emit("    content/system.md says nothing yet, so there is nothing "
+                 "to read these against")
+            return ""
+
+        signed = 0
+        for node in proj.nodes:
+            sec = node.section
+            if sec is None or sec.screens or signed_by_a_person(sec.meta):
+                continue
+            if sec.meta.get("verified_against") == "content/system.md":
+                continue
+            body = sec.path.read_text(encoding="utf-8")
+            res = assist.run_model(
+                f"{about}\n\n---\n\nHere is one section of this product's "
+                f"documentation. It describes no screen, so there is no crawl "
+                f"to hold it against. Hold it against the description above "
+                f"instead.\n\nAnswer on one line.\n"
+                f"Answer CLEAN if it contradicts nothing in the description, "
+                f"invents no feature the description does not support, and "
+                f"uses the product's own vocabulary.\n"
+                f"Otherwise answer PROBLEM: followed by one sentence saying "
+                f"what is wrong.\n\n"
+                f"Section {node.number} {sec.title}:\n\n{body[:6000]}",
+                system="You are checking documentation against the product's "
+                       "own description. Be strict about invented features and "
+                       "about vocabulary the description forbids.",
+                root=self.root, task="read the prose")
+            if not res.ok:
+                self._describe_blocked = (res.error or "")[:120]
+                break
+            verdict = (res.output or "").strip()
+            if not verdict.upper().startswith("CLEAN"):
+                emit(f"      {node.number} {sec.title}: {verdict[:90]}")
+                # Reporting it back is what this step used to do, and on the
+                # first real document that was twenty-two sections handed to a
+                # person for saying things the product's own description
+                # contradicts. Every one of them is answerable from that
+                # description, which is the thing being contradicted, so it is
+                # answered here and measured like any other change.
+                if self._mend_prose(sec, node, about, verdict, emit):
+                    signed += 1
+                continue
+            before = body
+            sec.meta = attest(sec.meta, f"the loop ({assist.DEFAULT_MODEL})",
+                              "content/system.md",
+                              _date.today().isoformat(), kind=LOOP)
+            sec.save(sec.path)
+            History(self.root).record(
+                sec.id, sec.path, before, sec.path.read_text(encoding="utf-8"),
+                actor="auto", action="accept",
+                note="the loop read this against the product description and "
+                     "found nothing it contradicts")
+            signed += 1
+
+        return f"{signed} section(s) read against the product description" \
+            if signed else ""
+
+    def _mend_prose(self, sec, node, about: str, verdict: str, emit) -> bool:
+        """Correct one section against the product's own description.
+
+        Held to everything a rewrite is held to here: the rules are counted
+        before and after and a worse count is put back, the figures must all
+        survive, and the whole thing is in History with a diff and a restore.
+        The section is signed only if the correction actually landed.
+        """
+        from datetime import date as _date
+
+        from .attest import LOOP, attest
+        from .console import assist
+        from .history import History
+        from .model import parse_section
+
+        before = sec.path.read_text(encoding="utf-8")
+        errors_before = self._errors()
+        snapshot = self._snapshot()
+        res = assist.run_model(
+            f"{about}\n\n---\n\nThis section of the documentation was read "
+            f"against the description above and this was found:\n\n{verdict}\n\n"
+            f"Rewrite the section so that is no longer true. Change nothing "
+            f"else. Keep every heading, every figure, every fenced block and "
+            f"the front matter exactly as they are. Do not invent anything the "
+            f"description does not support: if something cannot be said "
+            f"truthfully, take it out rather than replace it.\n\n"
+            f"Return the whole section file and nothing else.\n\n{before}",
+            system=assist.house_rules(self.root),
+            root=self.root, task="mend the prose")
+        if not res.ok:
+            self._describe_blocked = (res.error or "")[:120]
+            return False
+        proposed = assist.clean_output(res.output)
+        try:
+            parsed = parse_section(proposed, sec.path)
+        except Exception:
+            return False
+        if parsed.id != sec.id or proposed.strip() == before.strip():
+            return False
+        if not _keeps_every_figure(before, proposed):
+            emit("        rejected: the rewrite would drop a figure")
+            return False
+
+        sec.path.write_text(proposed, encoding="utf-8")
+        if self._errors() > errors_before:
+            self._restore(snapshot)
+            emit("        put back: the correction broke a rule")
+            return False
+
+        fresh = self._project().sections.get(sec.id)
+        if fresh is not None:
+            fresh.meta = attest(fresh.meta, f"the loop ({assist.DEFAULT_MODEL})",
+                                "content/system.md",
+                                _date.today().isoformat(), kind=LOOP)
+            fresh.save(fresh.path)
+        History(self.root).record(
+            sec.id, sec.path, before, sec.path.read_text(encoding="utf-8"),
+            actor="auto", action="review",
+            note=f"corrected against the product description: {verdict[:110]}")
+        emit("        corrected, and read again clean")
+        return True
+
+    def _sign_off(self, sec, run: str, emit) -> None:
+        """Record that the loop read this section against the crawl.
+
+        Only where it read it and found nothing to answer for, only against the
+        capture it actually used, and never over a person: somebody who has
+        read a section themselves outranks this and their signature stays.
+        """
+        from datetime import date as _date
+
+        from .attest import LOOP, attest, signed_by_a_person
+        from .console.assist import DEFAULT_MODEL
+        from .history import History
+
+        if not run or signed_by_a_person(sec.meta):
+            return
+        if sec.meta.get("verified_against") == run and sec.status == "verified":
+            return
+        before = sec.path.read_text(encoding="utf-8")
+        sec.meta = attest(sec.meta, f"the loop ({DEFAULT_MODEL})", run,
+                          _date.today().isoformat(), kind=LOOP)
+        sec.save(sec.path)
+        History(self.root).record(
+            sec.id, sec.path, before, sec.path.read_text(encoding="utf-8"),
+            actor="auto", action="accept",
+            note=f"the loop read this against capture {run} and found nothing "
+                 f"to answer for")
+        emit(f"      {sec.id}: read against the crawl, nothing outstanding")
+
     def _sweep(self, emit) -> str:
         from .decisions import Decisions
         from .knowledge import Knowledge
@@ -828,13 +1010,20 @@ class Auto:
             pass
 
         seen = _load_reviews(self.root)
-        corrected, looked = 0, 0
+        corrected, looked, signed = 0, 0, 0
         for node in proj.nodes:
             sec = node.section
             if sec is None or not sec.screens:
                 continue
             if seen.get(sec.id, {}).get("run") == run:
-                continue                       # already read against this capture
+                # Already read against this capture, so do not pay for the
+                # reading again. The verdict is kept, though, and a clean one
+                # is still a check that happened: signing from it is what makes
+                # a second run settle a document rather than skip past it.
+                if not _worth_fixing(seen[sec.id].get("report", "")):
+                    self._sign_off(sec, run, emit)
+                    signed += 1
+                continue
             inv = self._inventory_for(sec)
             if not inv:
                 continue                       # nothing to hold it against
@@ -861,6 +1050,14 @@ class Auto:
             seen[sec.id] = {"run": run, "report": report[:1200]}
 
             if not _worth_fixing(report):
+                # Read against the crawl and nothing to answer for. That is a
+                # check, so it is recorded as one, naming the loop as what made
+                # it. A document that says a person read it when none did is a
+                # lie; a document that says the loop checked it against the
+                # capture of such a date is true, and it is what this system is
+                # for. A person's signature is still worth more, and `verba
+                # accept` still upgrades it.
+                self._sign_off(sec, run, emit)
                 continue
 
             emit(f"      {node.number} {sec.title}: {_first_point(report)}")
@@ -898,9 +1095,14 @@ class Auto:
             proj = self._project()
 
         _save_reviews(self.root, seen)
+        parts = []
         if corrected:
-            return f"{corrected} section(s) corrected against the crawl"
-        return f"{looked} section(s) read against the crawl" if looked else ""
+            parts.append(f"{corrected} section(s) corrected against the crawl")
+        if looked:
+            parts.append(f"{looked} read")
+        if signed:
+            parts.append(f"{signed} signed off")
+        return ", ".join(parts)
 
     def _check_pictures_match(self, emit) -> str:
         """Is each picture actually of the thing its section describes?

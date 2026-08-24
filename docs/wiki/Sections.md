@@ -127,6 +127,37 @@ behind it drops the section back to `review`**, at the one point in the engine
 every machine write passes through, because a person verified the section they
 read and not the one a model rewrote after them.
 
+## Who signed it
+
+A signature names its signer. The loop signs what it has checked, and a person
+signs what they have read:
+
+```yaml
+status: verified
+verified_by: the loop (claude-sonnet-5)
+verified_against: content/system.md
+verified_kind: loop
+```
+
+The loop can check a section two ways. One bound to a screen is read against
+the crawl of that screen. One bound to no screen, an introduction or a page of
+key terms, has no crawl to be read against, so it is read against
+`content/system.md`, the description of the product you wrote: does this
+contradict it, does it invent a feature it does not support, does it use the
+vocabulary it forbids. On the first real document that found a chapter calling
+the product by a name that does not exist.
+
+`FRESH-04` reports a claim with no signer at all. `FRESH-05` reports, as
+information rather than a fault, the sections only the loop has read, so you
+can still find them. A person's signature outranks the loop's and is never
+written over; `verba accept` upgrades one.
+
+The rule this replaced said only a person may sign. That fixed the wrong half
+of the problem. The fault was a document claiming thirty-eight human checks
+that nobody had made, which is a lie about the signer, not a fact about
+automation, and requiring a person put a human bottleneck into a system built
+not to need one.
+
 When a section loses its signature the console says **why**: how many changes
 were made since you last signed it, by which step, and what each one did, with
 a button that opens the diff of the first one. "review" on its own tells nobody
